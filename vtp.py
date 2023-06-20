@@ -1,14 +1,10 @@
 #!/usr/bin/python
-# uvicorn vtp:App --reload --host 95.217.12.58 --port 444
 
-from starlette.responses import Response, JSONResponse
-from MessageEditor import MessageEditor
+from starlette.responses import Response
 from starlette.requests import Request
 from Source.Callback import Callback
 from fastapi import FastAPI
-from typing import Union
 
-import telebot
 import json
 import sys
 import os
@@ -27,12 +23,14 @@ if sys.version_info < PythonMinimalVersion:
 # >>>>> ЧТЕНИЕ НАСТРОЕК <<<<< #
 #==========================================================================================#
 
+# Обработчик запросов FastAPI.
+App = FastAPI()
 # Глобальные настройки.
 Settings = {
 	"token": "",
 	"group-id": "",
 	"source": "vk-group-wall",
-	"parse-mode": "MarkdownV2",
+	"parse-mode": None,
 	"confirmation-code": None
 }
 
@@ -56,13 +54,10 @@ if os.path.exists("Settings.json"):
 		if type(Settings["confirmation-code"]) != str or len(Settings["confirmation-code"]) == 0:
 			Settings["confirmation-code"] = "Confirmation code not found in settings file."
 
-# Обработчик запросов FastAPI.
-App = FastAPI()
-
 # Проверяет доступность сервера через браузер.
 @App.get("/vtp/{Source}")
 def CheckServer(Source: str):
-	return JSONResponse(content = {"source": Source, "status": "OK"})
+	return Response(content = "OK")
 
 # Обрабатывает запросы от серверов ВКонтакте по Callback API. 
 @App.post("/vtp/" + Settings["source"])
@@ -79,7 +74,7 @@ async def SendMessageToGroup(CallbackRequest: Request):
 
 		# Если тип запроса – новый пост.
 		if RequestData["type"] == "wall_post_new":
-			ObjectCallback = Callback(Settings, RequestData)
+			Callback(Settings, RequestData)
 
 	# Если нет поля типа, выбросить исключение.
 	else:

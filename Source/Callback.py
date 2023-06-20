@@ -9,12 +9,12 @@ class Callback:
 	# >>>>> СВОЙСТВА <<<<< #
 	#==========================================================================================#
 
-	# Глобальные настройки.
-	__Settings = dict()
 	# Callback-запрос.
 	__CallbackRequest = None
 	# Экземпляр бота.
 	__TelegramBot = None
+	# Глобальные настройки.
+	__Settings = dict()
 
 	#==========================================================================================#
 	# >>>>> МЕТОДЫ <<<<< #
@@ -23,6 +23,10 @@ class Callback:
 	# Экранирует символы при использовании MarkdownV2 разметки.
 	def __EscapeCharacters(self, Post: str) -> str:
 		Post = Post.replace('.', "\.")
+		Post = Post.replace('#', "\#")
+		Post = Post.replace('!', "\!")
+		Post = Post.replace('.', "\.")
+		Post = Post.replace('-', "\-")
 
 		return Post
 
