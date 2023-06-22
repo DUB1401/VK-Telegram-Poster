@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-from starlette.responses import Response
+from starlette.responses import HTMLResponse, Response
 from starlette.requests import Request
 from Source.Callback import Callback
 from fastapi import FastAPI
@@ -14,7 +14,7 @@ import os
 #==========================================================================================#
 
 # Минимальная требуемая версия Python.
-PythonMinimalVersion = (3, 9)
+PythonMinimalVersion = (3, 10)
 # Проверка соответствия.
 if sys.version_info < PythonMinimalVersion:
 	sys.exit("Python %s.%s or later is required.\n" % PythonMinimalVersion)
@@ -23,6 +23,10 @@ if sys.version_info < PythonMinimalVersion:
 # >>>>> ЧТЕНИЕ НАСТРОЕК <<<<< #
 #==========================================================================================#
 
+# Версия скрипта.
+Version = "0.2.0"
+# Текст копирайта.
+Copyright = "Copyright © DUB1401. 2022-2023."
 # Обработчик запросов FastAPI.
 App = FastAPI()
 # Глобальные настройки.
@@ -30,8 +34,11 @@ Settings = {
 	"token": "",
 	"group-id": "",
 	"source": "vk-group-wall",
+	"clean-tags": True,
 	"parse-mode": None,
-	"confirmation-code": None
+	"disable-web-page-preview": True,
+	"blacklist": list(),
+	"confirmation-code": ""
 }
 
 # Проверка доступности файла.
@@ -54,10 +61,25 @@ if os.path.exists("Settings.json"):
 		if type(Settings["confirmation-code"]) != str or len(Settings["confirmation-code"]) == 0:
 			Settings["confirmation-code"] = "Confirmation code not found in settings file."
 
+# Обработчик Callback-запросов.
+CallbackSender = Callback(Settings)
+
 # Проверяет доступность сервера через браузер.
 @App.get("/vtp/{Source}")
 def CheckServer(Source: str):
-	return Response(content = "OK")
+	# HTML-тело ответа для браузера.
+	ResponseBody = f"""
+		<body style="background-color: #0E1010; color: #D4CDF5;">
+			<span style="font-size: 200%;">VK-Telegram Poster</span><br>
+			<b>Source:</b> {Source}<br>
+			<b>Version:</b> {Version}<br>
+			<b>Status:</b> <span style="color: green;">200 OK</span><br>
+			<br>
+			{Copyright} | <a href="https://github.com/DUB1401/VK-Telegram-Poster" style="text-decoration: none; color: #F5E3CD;">GitHub</a><br>
+		</body>
+	"""
+
+	return HTMLResponse(content = ResponseBody)
 
 # Обрабатывает запросы от серверов ВКонтакте по Callback API. 
 @App.post("/vtp/" + Settings["source"])
@@ -74,7 +96,7 @@ async def SendMessageToGroup(CallbackRequest: Request):
 
 		# Если тип запроса – новый пост.
 		if RequestData["type"] == "wall_post_new":
-			Callback(Settings, RequestData)
+			CallbackSender.AddMessageToBufer(RequestData)
 
 	# Если нет поля типа, выбросить исключение.
 	else:

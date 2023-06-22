@@ -7,7 +7,7 @@
 # Copyright © DUB1401. 2022-2023.
 
 [Unit]
-Description=VK-Telegram-Poster
+Description=VK-Telegram Poster
 After=network.target
 
 [Service]

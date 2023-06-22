@@ -3,5 +3,8 @@
 	"group-id": "",
 	"source": "vk-group-wall",
 	"parse-mode": null,
+	"clean-tags": true,
+	"disable-web-page-preview": true,
+	"blacklist": [],
 	"confirmation-code": ""
 }
