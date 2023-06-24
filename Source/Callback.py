@@ -32,12 +32,13 @@ class Callback:
 		Post = Post.replace('#', "\#")
 		Post = Post.replace('!', "\!")
 		Post = Post.replace('-', "\-")
-
+		Post = Post.replace('(', "\(")
+		Post = Post.replace(')', "\)")
 		return Post
 
 	# Обрабатывает очередь сообщений.
 	def __SenderThread(self):
-		print("Start thread")
+		
 		# Пока сообщение не отправлено.
 		while True:
 
@@ -66,6 +67,11 @@ class Callback:
 
 	# Отправляет сообщение в группу Telegram через буфер ожидания.
 	def __SendMessage(self, Post: str):
+
+		# Экранировать символы при указанной разметке MarkdownV2.
+		if self.__Settings["parse-mode"] == "MarkdownV2":
+			Post = self.__EscapeCharacters(Post)
+
 		# Обработка текста поста пользовательским скриптом.
 		Post = MessageEditor(Post)
 		# Состояние: есть ли запрещённые слова в посте.
@@ -87,10 +93,6 @@ class Callback:
 		if Post != None and Post != "" and HasBlacklistWords == False:
 			# Обрезка текста поста до максимально дозволенной длинны.
 			Post = Post[:4096]
-
-			# Экранировать символы при указанной разметке MarkdownV2.
-			if self.__Settings["parse-mode"] == "MarkdownV2":
-				Post = self.__EscapeCharacters(Post)
 
 			# Помещение поста в очередь на отправку.
 			self.__MessagesBufer.append(Post)
@@ -114,10 +116,10 @@ class Callback:
 		#==========================================================================================#
 		self.__CallbackRequest = CallbackRequest
 
+		# Отправка сообщения в группу Telegram через буфер ожидания.
+		self.__SendMessage(CallbackRequest["object"]["text"])
+
 		# Активировать поток, если не активен.
 		if self.__Sender.is_alive() == False:
 			self.__Sender = Thread(target = self.__SenderThread)
 			self.__Sender.start()
-
-		# Отправка сообщения в группу Telegram через буфер ожидания.
-		self.__SendMessage(CallbackRequest["object"]["text"])

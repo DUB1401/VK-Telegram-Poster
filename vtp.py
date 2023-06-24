@@ -64,19 +64,34 @@ if os.path.exists("Settings.json"):
 # Обработчик Callback-запросов.
 CallbackSender = Callback(Settings)
 
-# Проверяет доступность сервера через браузер.
+# Обрабатывает запросы от браузера.
 @App.get("/vtp/{Source}")
 def CheckServer(Source: str):
+	# HTML-блок источника.
+	SourceHTML = None
+
+	# Проверка соответствия источника заданному настройками.
+	if Source == Settings["source"]:
+		SourceHTML = f"<span style=\"color: green;\">{Source}</span>"
+	else:
+		SourceHTML = f"<span style=\"color: red;\">{Source}</span>"
+
 	# HTML-тело ответа для браузера.
 	ResponseBody = f"""
-		<body style="background-color: #0E1010; color: #D4CDF5;">
-			<span style="font-size: 200%;">VK-Telegram Poster</span><br>
-			<b>Source:</b> {Source}<br>
-			<b>Version:</b> {Version}<br>
-			<b>Status:</b> <span style="color: green;">200 OK</span><br>
-			<br>
-			{Copyright} | <a href="https://github.com/DUB1401/VK-Telegram-Poster" style="text-decoration: none; color: #F5E3CD;">GitHub</a><br>
-		</body>
+		<html>
+			<head>
+				<title>VK-Telegram Poster</title>
+				<link rel="icon" href="https://web.telegram.org/a/favicon.svg" type="image/svg+xml">
+			</head>
+			<body style="background-color: #0E1010; color: #D4CDF5;">
+				<span style="font-size: 200%;">VK-Telegram Poster</span><br>
+				<b>Source:</b> {SourceHTML}<br>
+				<b>Version:</b> {Version}<br>
+				<b>Status:</b> <span style="color: green;">200 OK</span><br>
+				<br>
+				{Copyright} | <a href="https://github.com/DUB1401/VK-Telegram-Poster" style="text-decoration: none; color: #F5E3CD;">GitHub</a><br>
+			</body>
+		</html>
 	"""
 
 	return HTMLResponse(content = ResponseBody)
