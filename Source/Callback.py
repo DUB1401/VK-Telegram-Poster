@@ -1,9 +1,9 @@
-from Source.DUBLIB import RemoveRegexSubstring
 from MessageEditor import MessageEditor
 from threading import Thread
 from time import sleep
 
 import telebot
+import re
 
 class Callback:
     
@@ -26,14 +26,26 @@ class Callback:
 	# >>>>> МЕТОДЫ <<<<< #
 	#==========================================================================================#
 
+	# Очищает сообщение от упоминаний в тегах ВКонтакте.
+	def __CleanTags(self, Post: str) -> str:
+		# Поиск всех совпадений.
+		RegexSubstrings = re.findall("#\w+@\w+", Post)
+
+		# Удаление каждой подстроки.
+		for RegexSubstring in RegexSubstrings:
+			Post = Post.replace("@" + RegexSubstring.split('@')[1], "")
+		print(Post)
+		return Post
+
 	# Экранирует символы при использовании MarkdownV2 разметки.
 	def __EscapeCharacters(self, Post: str) -> str:
-		Post = Post.replace('.', "\.")
-		Post = Post.replace('#', "\#")
-		Post = Post.replace('!', "\!")
-		Post = Post.replace('-', "\-")
-		Post = Post.replace('(', "\(")
-		Post = Post.replace(')', "\)")
+		# Список экранируемых символов. _ * [ ] ( ) ~ ` > # + - = | { } . !
+		CharactersList = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']
+
+		# Экранировать каждый символ из списка.
+		for Character in CharactersList:
+			Post = Post.replace(Character, "\\" + Character)
+
 		return Post
 
 	# Обрабатывает очередь сообщений.
@@ -47,7 +59,7 @@ class Callback:
 
 				try:
 					# Попытка отправить сообщение.
-					self.__TelegramBot.send_message(self.__Settings["group-id"], self.__MessagesBufer[0], parse_mode = self.__Settings["parse-mode"], disable_web_page_preview = self.__Settings["disable-web-page-preview"])
+					self.__TelegramBot.send_message(self.__Settings["target-id"], self.__MessagesBufer[0], parse_mode = self.__Settings["parse-mode"], disable_web_page_preview = self.__Settings["disable-web-page-preview"])
 
 				except telebot.apihelper.ApiTelegramException as ExceptionData:
 					# Описание исключения.
@@ -56,6 +68,10 @@ class Callback:
 					# Если исключение вызвано частыми запросами, то выждать указанный интервал.
 					if "Too Many Requests" in Description:
 						sleep(int(Description.split()[-1]) + 1)
+
+					# Иначе удалить первое сообщение в очереди отправки.
+					else:
+						self.__MessagesBufer.pop(0)
 
 				else:
 					# Удаление первого сообщения в очереди отправки.
@@ -79,7 +95,7 @@ class Callback:
 
 		# Если включена очистка тегов.
 		if self.__Settings["clean-tags"] == True:
-			Post = RemoveRegexSubstring("@\w+", Post)
+			Post = self.__CleanTags(Post)
 
 		# Для каждого запрещённого слова проверить соответствие словам поста.
 		for ForbiddenWord in self.__Settings["blacklist"]:

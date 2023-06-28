@@ -24,7 +24,7 @@ if sys.version_info < PythonMinimalVersion:
 #==========================================================================================#
 
 # Версия скрипта.
-Version = "0.2.0"
+Version = "0.2.1"
 # Текст копирайта.
 Copyright = "Copyright © DUB1401. 2022-2023."
 # Обработчик запросов FastAPI.
@@ -32,7 +32,7 @@ App = FastAPI()
 # Глобальные настройки.
 Settings = {
 	"token": "",
-	"group-id": "",
+	"target-id": "",
 	"source": "vk-group-wall",
 	"clean-tags": True,
 	"parse-mode": None,
@@ -54,8 +54,8 @@ if os.path.exists("Settings.json"):
 			raise Exception("Incorrect Telegram bot's token.")
 
 		# Проверка корректности заданного пароля.
-		if type(Settings["group-id"]) != str or len(Settings["group-id"]) == 0:
-			raise Exception("Incorrect group ID.")
+		if type(Settings["target-id"]) != str or len(Settings["target-id"]) == 0:
+			raise Exception("Incorrect group or channel ID.")
 
 		# Установка информирующего сообщения в случае отсутствия кода подтверждения сервера.
 		if type(Settings["confirmation-code"]) != str or len(Settings["confirmation-code"]) == 0:
