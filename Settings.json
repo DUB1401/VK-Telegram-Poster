@@ -6,5 +6,7 @@
 	"clean-tags": true,
 	"disable-web-page-preview": true,
 	"blacklist": [],
-	"confirmation-code": ""
+	"confirmation-code": "",
+	"logging": false,
+	"debug": false
 }

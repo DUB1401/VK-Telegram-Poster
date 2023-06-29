@@ -2,6 +2,7 @@ from MessageEditor import MessageEditor
 from threading import Thread
 from time import sleep
 
+import logging
 import telebot
 import re
 
@@ -13,8 +14,6 @@ class Callback:
 
 	# Очередь отложенных сообщений.
 	__MessagesBufer = list()
-	# Callback-запрос.
-	__CallbackRequest = None
 	# Экземпляр бота.
 	__TelegramBot = None
 	# Глобальные настройки.
@@ -34,7 +33,10 @@ class Callback:
 		# Удаление каждой подстроки.
 		for RegexSubstring in RegexSubstrings:
 			Post = Post.replace("@" + RegexSubstring.split('@')[1], "")
-		print(Post)
+		
+		# Запись в лог отладочной информации: количество очищенных тегов ВКонтакте.
+		logging.debug("Cleaned tags count: " + str(len(RegexSubstrings)) + ".")
+
 		return Post
 
 	# Экранирует символы при использовании MarkdownV2 разметки.
@@ -50,7 +52,9 @@ class Callback:
 
 	# Обрабатывает очередь сообщений.
 	def __SenderThread(self):
-		
+		# Запись в лог отладочной информации: поток очереди отправки запущен.
+		logging.debug("Sender thread started.")
+
 		# Пока сообщение не отправлено.
 		while True:
 
@@ -69,8 +73,10 @@ class Callback:
 					if "Too Many Requests" in Description:
 						sleep(int(Description.split()[-1]) + 1)
 
-					# Иначе удалить первое сообщение в очереди отправки.
 					else:
+						# Запись в лог ошибки: исключение Telegram.
+						logging.error("Telegram exception: \"" + Description + "\".")
+						# Удаление первого сообщения в очереди отправки.
 						self.__MessagesBufer.pop(0)
 
 				else:
@@ -78,6 +84,8 @@ class Callback:
 					self.__MessagesBufer.pop(0)
 
 			else:
+				# Запись в лог отладочной информации: поток очереди отправки оставновлен.
+				logging.debug("Sender thread stopped.")
 				# Остановка потока.
 				break
 
@@ -112,6 +120,10 @@ class Callback:
 
 			# Помещение поста в очередь на отправку.
 			self.__MessagesBufer.append(Post)
+
+		else:
+			# Запись в лог отладочной информации: пост был проигнорирован.
+			logging.debug("Post was ignored.")
 		
 	# Конструктор: задаёт глобальные настройки и тело Callback-запроса.
 	def __init__(self, Settings: dict):
