@@ -63,7 +63,7 @@ class Callback:
 
 				try:
 					# Попытка отправить сообщение.
-					self.__TelegramBot.send_message(self.__Settings["target-id"], self.__MessagesBufer[0], parse_mode = self.__Settings["parse-mode"], disable_web_page_preview = self.__Settings["disable-web-page-preview"])
+					self.__TelegramBot.send_message(self.__Settings["target-id"], self.__MessagesBufer[0]["text"], parse_mode = self.__Settings["parse-mode"], disable_web_page_preview = self.__Settings["disable-web-page-preview"])
 
 				except telebot.apihelper.ApiTelegramException as ExceptionData:
 					# Описание исключения.
@@ -90,36 +90,43 @@ class Callback:
 				break
 
 	# Отправляет сообщение в группу Telegram через буфер ожидания.
-	def __SendMessage(self, Post: str):
+	def __SendMessage(self, PostObject: dict):
+		# Состояние: есть ли запрещённые слова в посте.
+		HasBlacklistWords = False
+		# Объект сообщения.
+		MessageStruct = {
+			"text": None,
+			"attachments": list()
+		}
 
 		# Экранировать символы при указанной разметке MarkdownV2.
 		if self.__Settings["parse-mode"] == "MarkdownV2":
-			Post = self.__EscapeCharacters(Post)
+			PostObject["text"] = self.__EscapeCharacters(PostObject["text"])
 
 		# Обработка текста поста пользовательским скриптом.
-		Post = MessageEditor(Post)
-		# Состояние: есть ли запрещённые слова в посте.
-		HasBlacklistWords = False
+		PostObject["text"] = MessageEditor(PostObject["text"])
 
-		# Если включена очистка тегов.
+		# Если включена очистка тегов, то удалить упоминания из них.
 		if self.__Settings["clean-tags"] == True:
-			Post = self.__CleanTags(Post)
+			PostObject["text"] = self.__CleanTags(PostObject["text"])
 
 		# Для каждого запрещённого слова проверить соответствие словам поста.
 		for ForbiddenWord in self.__Settings["blacklist"]:
-			for Word in Post.split():
+			for Word in PostObject["text"].split():
 
 				# Если пост содержит запрещённое слово, то игнорировать его.
 				if ForbiddenWord.lower() == Word.lower():
 					HasBlacklistWords = True
 
 		# Если сообщение не игнорируется.
-		if Post != None and Post != "" and HasBlacklistWords == False:
+		if PostObject["text"] != None and PostObject["text"] != "" and HasBlacklistWords == False:
 			# Обрезка текста поста до максимально дозволенной длинны.
-			Post = Post[:4096]
+			PostObject["text"] = PostObject["text"][:4096]
+			# Копирование текста из поста в сообщение.
+			MessageStruct["text"] = PostObject["text"]
 
 			# Помещение поста в очередь на отправку.
-			self.__MessagesBufer.append(Post)
+			self.__MessagesBufer.append(MessageStruct)
 
 		else:
 			# Запись в лог отладочной информации: пост был проигнорирован.
@@ -139,13 +146,10 @@ class Callback:
 		
 	# Добавляет сообщение в очередь отправки.
 	def AddMessageToBufer(self, CallbackRequest: dict):
-
-		#---> Генерация свойств.
-		#==========================================================================================#
+		# Сохранение тела запроса.
 		self.__CallbackRequest = CallbackRequest
-
 		# Отправка сообщения в группу Telegram через буфер ожидания.
-		self.__SendMessage(CallbackRequest["object"]["text"])
+		self.__SendMessage(CallbackRequest["object"])
 
 		# Активировать поток, если не активен.
 		if self.__Sender.is_alive() == False:
