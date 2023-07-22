@@ -1,4 +1,4 @@
-from telebot.types import InputMediaPhoto
+from telebot.types import InputMediaPhoto, InputMediaVideo
 from MessageEditor import MessageEditor
 from threading import Thread
 from time import sleep
@@ -15,6 +15,8 @@ class Callback:
 	# >>>>> СВОЙСТВА <<<<< #
 	#==========================================================================================#
 
+	# Экзмепляры обработчиков постов.
+	__PostsEditorsThreads = list()
 	# Очередь отложенных сообщений.
 	__MessagesBufer = list()
 	# Экземпляр бота.
@@ -57,46 +59,77 @@ class Callback:
 	def __GetAttachements(self, PostAttachements: dict) -> list:
 		# Список вложений.
 		Attachements = list()
+		# Список поддерживаемых вложений.
+		SupportedTypes = list()
+
+		# Формирование списка включённых вложений.
+		for Type in self.__Settings["attachments"].keys():
+			if self.__Settings["attachments"][Type] == True:
+				SupportedTypes.append(Type)
 
 		# Если нет папки для хранения вложений, то создать.
 		if os.path.isdir("Temp") == False:
 			os.makedirs("Temp")
-		
-		# Для каждого вложения.
+
+		# Для каждого вложения проверить соответствие поддерживаемым типам.
 		for Attachment in PostAttachements:
+			for Type in SupportedTypes:
 
-			# Если фото является вложением.
-			if Attachment["type"] == "photo":
-				# Буфер описания вложения.
-				Bufer = {
-					"type": "photo",
-					"url": Attachment["photo"]["sizes"][-1]["url"],
-					"filename": Attachment["photo"]["sizes"][-1]["url"].split('?')[0].split('/')[-1]
-				}
-
-				# Если изображения не существует.
-				if os.path.exists("Temp/" + Bufer["filename"]) == False:
-					# Запись в лог отладочной информации: URL загружаемого вложения.
-					logging.debug("Downloading attachment (\"photo\"): " + Bufer["url"])
-					# Запрос изображения.
-					Response = requests.get(Bufer["url"])
+				# Если вложение поддерживается.
+				if Attachment["type"] == Type:
+					# Буфер описания вложения.
+					Bufer = {
+						"type": Type,
+						"url": None,
+						"filename": None
+					}
 					
-					# Если удалось запросить фото.
-					if Response.status_code == 200:
-						# Запись описания вложения в список вложений.
-						Attachements.append(Bufer)
+					# Получение URL вложения и названия файла (photo).
+					if Bufer["type"] == "photo":
+						Bufer["url"] = Attachment[Type]["sizes"][-1]["url"]
+						Bufer["filename"] = Attachment[Type]["sizes"][-1]["url"].split('?')[0].split('/')[-1]
 
-						# Сохранить изображение в файл.
-						with open("Temp/" + Bufer["filename"], "wb") as FileWriter:
-							FileWriter.write(Response.content)
+					# Получение URL вложения и названия файла (video).
+					if Bufer["type"] == "video":
+						Bufer["url"] = "https://vk.com/video" + str(Attachment[Type]["owner_id"]) + "_" + str(Attachment[Type]["id"])
+						Bufer["filename"] = str(Attachment[Type]["id"]) + ".mp4"
+					
+					# Если вложение не было загружено раньше.
+					if os.path.exists("Temp/" + Bufer["filename"]) == False:
+						# Запись в лог отладочной информации: URL загружаемого вложения.
+						logging.debug("Downloading attachment (\"" + Type + "\"): " + Bufer["url"])
+
+						# Загрузка вложения (photo).
+						if Bufer["type"] == "photo":
+							# Запрос вложения.
+							Response = requests.get(Bufer["url"])
+					
+							# Если удалось запросить вложение.
+							if Response.status_code == 200:
+								# Запись описания вложения в список вложений.
+								Attachements.append(Bufer)
+
+								# Сохранить вложение в файл.
+								with open("Temp/" + Bufer["filename"], "wb") as FileWriter:
+									FileWriter.write(Response.content)
+
+							else:
+								# Запись в лог ошибки: не удалось загрузить вложение.
+								logging.error("Unable to download attachment (\"" + Type + "\"). Request code: " + str(Response.status_code) + ".")
+
+						# Загрузка вложения (video).
+						if Bufer["type"] == "video":
+							# Загрузить видео с помощью кроссплатформенной версии yt-dlp.
+							ExitCode = os.system("python yt-dlp -o " + Bufer["filename"] + " -P Temp " + Bufer["url"])
+
+							# Если загрузка успешна.
+							if ExitCode == 0:
+								# Запись описания вложения в список вложений.
+								Attachements.append(Bufer)
 
 					else:
-						# Запись в лог ошибки: не удалось загрузить вложение (фото).
-						logging.error("Unable to download attachment (\"photo\"). Request code: " + str(Response.status_code) + ".")
-
-				else:
-					# Запись описания вложения в список вложений.
-					Attachements.append(Bufer)
+						# Запись описания вложения в список вложений.
+						Attachements.append(Bufer)
 						
 		return Attachements
 
@@ -118,14 +151,28 @@ class Callback:
 
 					# Для каждого вложения.
 					for Index in range(0, len(self.__MessagesBufer[0]["attachments"])):
-						# Дополнить медиа группу вложением (для первого задать текст сообщения).
-						MediaGroup.append(
-							InputMediaPhoto(
-								open("Temp/" + self.__MessagesBufer[0]["attachments"][Index]["filename"], "rb"), 
-								caption = self.__MessagesBufer[0]["text"][:1024] if Index == 0 else "",
-								parse_mode = self.__Settings["parse-mode"] if Index == 0 else None
+
+						# Если тип вложения – photo.
+						if self.__MessagesBufer[0]["attachments"][Index]["type"] == "photo":
+							# Дополнить медиа группу вложением (photo).
+							MediaGroup.append(
+								InputMediaPhoto(
+									open("Temp/" + self.__MessagesBufer[0]["attachments"][Index]["filename"], "rb"), 
+									caption = self.__MessagesBufer[0]["text"] if Index == 0 else "",
+									parse_mode = self.__Settings["parse-mode"] if Index == 0 else None
+								)
 							)
-						)
+
+						# Если тип вложения – video.
+						if self.__MessagesBufer[0]["attachments"][Index]["type"] == "video":
+							# Дополнить медиа группу вложением (video).
+							MediaGroup.append(
+								InputMediaVideo(
+									open("Temp/" + self.__MessagesBufer[0]["attachments"][Index]["filename"], "rb"), 
+									caption = self.__MessagesBufer[0]["text"] if Index == 0 else "",
+									parse_mode = self.__Settings["parse-mode"] if Index == 0 else None
+								)
+							)
 
 				try:
 
@@ -215,7 +262,12 @@ class Callback:
 
 		else:
 			# Запись в лог отладочной информации: пост был проигнорирован.
-			logging.debug("Post was ignored.")
+			logging.debug("Post " + str(PostObject["id"]) + " was ignored.")
+
+		# Активировать поток отправки, если не активен.
+		if self.__Sender.is_alive() == False:
+			self.__Sender = Thread(target = self.__SenderThread, name = "VK-Telegram Poster (sender)")
+			self.__Sender.start()
 		
 	# Конструктор: задаёт глобальные настройки и тело Callback-запроса.
 	def __init__(self, Settings: dict):
@@ -233,10 +285,15 @@ class Callback:
 	def AddMessageToBufer(self, CallbackRequest: dict):
 		# Сохранение тела запроса.
 		self.__CallbackRequest = CallbackRequest
-		# Отправка сообщения в группу Telegram через буфер ожидания.
-		self.__SendMessage(CallbackRequest["object"])
 
-		# Активировать поток, если не активен.
-		if self.__Sender.is_alive() == False:
-			self.__Sender = Thread(target = self.__SenderThread)
-			self.__Sender.start()
+		# Проверка работы потоков.
+		for Index in range(0, len(self.__PostsEditorsThreads)):
+
+			# Если поток завершил работу, то удалить его из списка.
+			if self.__PostsEditorsThreads[Index].is_alive() == False:
+				self.__PostsEditorsThreads.pop(Index)
+
+		# Добавление потока обработчика поста в список.
+		self.__PostsEditorsThreads.append(Thread(target = self.__SendMessage, args = (CallbackRequest["object"],)))
+		# Запуск потока обработчика поста в список.
+		self.__PostsEditorsThreads[-1].start()

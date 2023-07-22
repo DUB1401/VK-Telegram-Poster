@@ -42,7 +42,7 @@ logging.basicConfig(filename = LogFilename, encoding = "utf-8", level = logging.
 #==========================================================================================#
 
 # Версия скрипта.
-Version = "0.2.2"
+Version = "0.3.0"
 # Текст копирайта.
 Copyright = "Copyright © DUB1401. 2022-2023."
 # Обработчик запросов FastAPI.
@@ -56,7 +56,15 @@ Settings = {
 	"parse-mode": None,
 	"disable-web-page-preview": True,
 	"blacklist": list(),
-	"confirmation-code": ""
+	"attachments": {
+		"audio": True,
+		"doc": True,
+		"photo": True,
+		"video": True
+	},
+	"confirmation-code": "",
+	"logging": False,
+	"debug": False
 }
 # Запись в лог сообщения: версия скрипта.
 logging.info("====== VK-Telegram Poster v" + Version + " ======")
@@ -198,7 +206,7 @@ async def SendMessageToGroup(CallbackRequest: Request):
 		# Если тип запроса – новый пост.
 		if RequestData["type"] == "wall_post_new":
 			# Запись в лог сообщения: .
-			logging.info("New post with ID: " + str(RequestData["object"]["id"]) + ".")
+			logging.info("New post with ID: " + str(RequestData["object"]["id"]) + ". Attachments count: " + str(len(RequestData["object"]["attachments"])) + ".")
 			# Добавление поста в буфер отложенной отправки.
 			CallbackSender.AddMessageToBufer(RequestData)
 

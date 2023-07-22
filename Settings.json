@@ -6,6 +6,10 @@
 	"clean-tags": true,
 	"disable-web-page-preview": true,
 	"blacklist": [],
+	"attachments": {
+		"photo": true,
+		"video": true
+	},
 	"confirmation-code": "",
 	"logging": false,
 	"debug": false
