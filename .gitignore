@@ -1,5 +1,11 @@
+# Visual Studio project files.
 VK-Telegram Poster.pyproj
 VK-Telegram Poster.sln
-__pycache__
-Logs
 .vs
+
+# Python cache.
+__pycache__
+
+# Work folders.
+Logs
+Temp

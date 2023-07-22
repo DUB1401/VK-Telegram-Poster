@@ -1,9 +1,12 @@
+from telebot.types import InputMediaPhoto
 from MessageEditor import MessageEditor
 from threading import Thread
 from time import sleep
 
+import requests
 import logging
 import telebot
+import os
 import re
 
 class Callback:
@@ -50,6 +53,53 @@ class Callback:
 
 		return Post
 
+	# Получает URL вложения и загружает его.
+	def __GetAttachements(self, PostAttachements: dict) -> list:
+		# Список вложений.
+		Attachements = list()
+
+		# Если нет папки для хранения вложений, то создать.
+		if os.path.isdir("Temp") == False:
+			os.makedirs("Temp")
+		
+		# Для каждого вложения.
+		for Attachment in PostAttachements:
+
+			# Если фото является вложением.
+			if Attachment["type"] == "photo":
+				# Буфер описания вложения.
+				Bufer = {
+					"type": "photo",
+					"url": Attachment["photo"]["sizes"][-1]["url"],
+					"filename": Attachment["photo"]["sizes"][-1]["url"].split('?')[0].split('/')[-1]
+				}
+
+				# Если изображения не существует.
+				if os.path.exists("Temp/" + Bufer["filename"]) == False:
+					# Запись в лог отладочной информации: URL загружаемого вложения.
+					logging.debug("Downloading attachment (\"photo\"): " + Bufer["url"])
+					# Запрос изображения.
+					Response = requests.get(Bufer["url"])
+					
+					# Если удалось запросить фото.
+					if Response.status_code == 200:
+						# Запись описания вложения в список вложений.
+						Attachements.append(Bufer)
+
+						# Сохранить изображение в файл.
+						with open("Temp/" + Bufer["filename"], "wb") as FileWriter:
+							FileWriter.write(Response.content)
+
+					else:
+						# Запись в лог ошибки: не удалось загрузить вложение (фото).
+						logging.error("Unable to download attachment (\"photo\"). Request code: " + str(Response.status_code) + ".")
+
+				else:
+					# Запись описания вложения в список вложений.
+					Attachements.append(Bufer)
+						
+		return Attachements
+
 	# Обрабатывает очередь сообщений.
 	def __SenderThread(self):
 		# Запись в лог отладочной информации: поток очереди отправки запущен.
@@ -60,11 +110,42 @@ class Callback:
 
 			# Если в очереди на отправку есть сообщения.
 			if len(self.__MessagesBufer) > 0:
+				# Список медиа-вложений.
+				MediaGroup = list()
+
+				# Если у сообщения есть вложения.
+				if len(self.__MessagesBufer[0]["attachments"]) > 0:
+
+					# Для каждого вложения.
+					for Index in range(0, len(self.__MessagesBufer[0]["attachments"])):
+						# Дополнить медиа группу вложением (для первого задать текст сообщения).
+						MediaGroup.append(
+							InputMediaPhoto(
+								open("Temp/" + self.__MessagesBufer[0]["attachments"][Index]["filename"], "rb"), 
+								caption = self.__MessagesBufer[0]["text"][:1024] if Index == 0 else "",
+								parse_mode = self.__Settings["parse-mode"] if Index == 0 else None
+							)
+						)
 
 				try:
-					# Попытка отправить сообщение.
-					self.__TelegramBot.send_message(self.__Settings["target-id"], self.__MessagesBufer[0]["text"], parse_mode = self.__Settings["parse-mode"], disable_web_page_preview = self.__Settings["disable-web-page-preview"])
 
+					# Если есть вложения.
+					if len(MediaGroup) > 0:
+						# Отправка медиа группы.
+						self.__TelegramBot.send_media_group(
+							self.__Settings["target-id"], 
+							media = MediaGroup
+						)
+
+					else:
+						# Отправка текстового сообщения.
+						self.__TelegramBot.send_message(
+							self.__Settings["target-id"], 
+							self.__MessagesBufer[0]["text"], 
+							parse_mode = self.__Settings["parse-mode"], 
+							disable_web_page_preview = self.__Settings["disable-web-page-preview"]
+						)
+					
 				except telebot.apihelper.ApiTelegramException as ExceptionData:
 					# Описание исключения.
 					Description = str(ExceptionData)
@@ -124,7 +205,11 @@ class Callback:
 			PostObject["text"] = PostObject["text"][:4096]
 			# Копирование текста из поста в сообщение.
 			MessageStruct["text"] = PostObject["text"]
-
+			
+			# Если есть вложения.
+			if len(PostObject["attachments"]) > 0:
+				MessageStruct["attachments"] = self.__GetAttachements(PostObject["attachments"])
+			
 			# Помещение поста в очередь на отправку.
 			self.__MessagesBufer.append(MessageStruct)
 
