@@ -7,6 +7,7 @@
 	"disable-web-page-preview": true,
 	"blacklist": [],
 	"attachments": {
+		"doc": true,
 		"photo": true,
 		"video": true
 	},

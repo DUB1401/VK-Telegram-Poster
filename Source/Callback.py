@@ -1,4 +1,4 @@
-from telebot.types import InputMediaPhoto, InputMediaVideo
+from telebot.types import InputMediaDocument, InputMediaPhoto, InputMediaVideo
 from MessageEditor import MessageEditor
 from threading import Thread
 from time import sleep
@@ -83,6 +83,11 @@ class Callback:
 						"url": None,
 						"filename": None
 					}
+
+					# Получение URL вложения и названия файла (doc).
+					if Bufer["type"] == "doc":
+						Bufer["url"] = Attachment[Type]["url"]
+						Bufer["filename"] = Attachment[Type]["url"].split('?')[0].split('/')[-1] + "." + Attachment[Type]["ext"]
 					
 					# Получение URL вложения и названия файла (photo).
 					if Bufer["type"] == "photo":
@@ -98,9 +103,9 @@ class Callback:
 					if os.path.exists("Temp/" + Bufer["filename"]) == False:
 						# Запись в лог отладочной информации: URL загружаемого вложения.
 						logging.debug("Downloading attachment (\"" + Type + "\"): " + Bufer["url"])
-
-						# Загрузка вложения (photo).
-						if Bufer["type"] == "photo":
+						
+						# Загрузка вложения (doc, photo).
+						if Bufer["type"] in ["doc", "photo"]:
 							# Запрос вложения.
 							Response = requests.get(Bufer["url"])
 					
@@ -108,7 +113,7 @@ class Callback:
 							if Response.status_code == 200:
 								# Запись описания вложения в список вложений.
 								Attachements.append(Bufer)
-
+								
 								# Сохранить вложение в файл.
 								with open("Temp/" + Bufer["filename"], "wb") as FileWriter:
 									FileWriter.write(Response.content)
@@ -151,6 +156,17 @@ class Callback:
 
 					# Для каждого вложения.
 					for Index in range(0, len(self.__MessagesBufer[0]["attachments"])):
+
+						# Если тип вложения – doc.
+						if self.__MessagesBufer[0]["attachments"][Index]["type"] == "doc":
+							# Дополнить медиа группу вложением (doc).
+							MediaGroup.append(
+								InputMediaDocument(
+									open("Temp/" + self.__MessagesBufer[0]["attachments"][Index]["filename"], "rb"), 
+									caption = self.__MessagesBufer[0]["text"] if Index == 0 else "",
+									parse_mode = self.__Settings["parse-mode"] if Index == 0 else None
+								)
+							)
 
 						# Если тип вложения – photo.
 						if self.__MessagesBufer[0]["attachments"][Index]["type"] == "photo":
