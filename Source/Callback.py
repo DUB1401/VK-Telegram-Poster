@@ -234,20 +234,21 @@ class Callback:
 		# Обработка текста поста пользовательским скриптом.
 		PostObject["text"] = MessageEditor(PostObject["text"], Source)
 
-		# Если включена очистка тегов, то удалить упоминания из них.
-		if self.__Settings["clean-tags"] == True:
-			PostObject["text"] = self.__CleanTags(PostObject["text"])
-
-		# Для каждого запрещённого слова проверить соответствие словам поста.
-		for ForbiddenWord in self.__Settings["blacklist"]:
-			for Word in PostObject["text"].split():
-
-				# Если пост содержит запрещённое слово, то игнорировать его.
-				if ForbiddenWord.lower() == Word.lower():
-					HasBlacklistWords = True
-
 		# Если сообщение не игнорируется.
 		if PostObject["text"] != None and PostObject["text"] != "" and HasBlacklistWords == False:
+			
+			# Если включена очистка тегов, то удалить упоминания из них.
+			if self.__Settings["clean-tags"] == True:
+				PostObject["text"] = self.__CleanTags(PostObject["text"])
+
+			# Для каждого запрещённого слова проверить соответствие словам поста.
+			for ForbiddenWord in self.__Settings["blacklist"]:
+				for Word in PostObject["text"].split():
+
+					# Если пост содержит запрещённое слово, то игнорировать его.
+					if ForbiddenWord.lower() == Word.lower():
+						HasBlacklistWords = True
+
 			# Обрезка текста поста до максимально дозволенной длинны.
 			PostObject["text"] = PostObject["text"][:4096]
 			# Копирование текста из поста в сообщение.
