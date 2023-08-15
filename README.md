@@ -24,16 +24,25 @@ pip install -r requirements.txt
 7. Открыть директорию со скриптом в терминале. Можно использовать метод `cd` и прописать путь к папке, либо запустить терминал из проводника. Активировать автопостер командой `uvicorn vtp:App --host {IP} --port {PORT}`.
 8. Для автоматического запуска службы рекомендуется провести инициализацию скрипта через [systemd](https://github.com/systemd/systemd) (пример [здесь](https://github.com/DUB1401/VK-Telegram-Poster/tree/main/systemd)) на Linux или путём добавления его в автозагрузку на Windows.
 
+## Версии поставляемых бинарных файлов
+| Файл    | Версия                        | Источник                                                           |
+|---------|-------------------------------|--------------------------------------------------------------------|
+| yt-dlp  | _2023.07.06_                  | [ссылка](https://github.com/yt-dlp/yt-dlp/releases/tag/2023.07.06) |
+
 # Settings.json
 ```JSON
-"token": ""
+"tokens": {
+	"vk-group-wall": "{TELEGRAM_BOT_TOKEN}"
+}
 ```
-Сюда необходимо занести токен бота Telegram (можно узнать у [BotFather](https://t.me/BotFather)).
+Сюда необходимо занести токены ботов Telegram (можно узнать у [BotFather](https://t.me/BotFather)). Ключём должен являться уникальный источник, использующийся для прослушивания Callback-запросов и соответствующий таковому в поле `targets`.
 ___
 ```JSON
-"target-id": ""
+"targets": {
+	"vk-group-wall": "{GROUP_OR_CHANNEL_ID}"
+}
 ```
-Сюда необходимо занести  ID группы или канала Telegram (можно получить у [Chat ID Bot](https://t.me/chat_id_echo_bot)).
+Сюда необходимо занести ID групп или каналов Telegram (можно получить у [Chat ID Bot](https://t.me/chat_id_echo_bot)). Ключём должен являться уникальный источник, использующийся для прослушивания Callback-запросов и соответствующий таковому в поле `tokens`.
 ___
 ```JSON
 "source": "vk-group-wall"

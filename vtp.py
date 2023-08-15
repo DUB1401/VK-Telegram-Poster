@@ -42,7 +42,7 @@ logging.basicConfig(filename = LogFilename, encoding = "utf-8", level = logging.
 #==========================================================================================#
 
 # Версия скрипта.
-Version = "0.3.0"
+Version = "1.0.0"
 # Текст копирайта.
 Copyright = "Copyright © DUB1401. 2022-2023."
 # Обработчик запросов FastAPI.
@@ -78,20 +78,16 @@ if os.path.exists("Settings.json"):
 	with open("Settings.json", encoding = "utf-8") as FileRead:
 		# Чтение настроек.
 		Settings = json.load(FileRead)
-
-		# Проверка корректности заданного логина.
-		if type(Settings["token"]) is not str or len(Settings["token"]) == 0:
-			# Запись в лог ошибки: некорректный токен бота.
-			logging.error("Incorrect Telegram bot's token.")
-			# Выброс исключения.
-			raise Exception("Incorrect Telegram bot's token.")
-
-		# Проверка корректности заданного пароля.
-		if type(Settings["target-id"]) != str or len(Settings["target-id"]) == 0:
-			# Запись в лог ошибки: некоррентный ID группы или канала.
-			logging.error("Incorrect group or channel ID.")
-			# Выброс исключения.
-			raise Exception("Incorrect group or channel ID.")
+		# Списки ключей токенов и целей.
+		Tokens = list(Settings["tokens"].keys())
+		Targets = list(Settings["targets"].keys())
+		# Сортировка ключей.
+		Tokens.sort()
+		Targets.sort()
+		
+		# Если списки целей и токенов не соответствуют.
+		if Tokens != Targets:
+			raise Exception("lists of tokens and targets not match")
 
 		# Если отсутствует кода подтверждения сервера.
 		if type(Settings["confirmation-code"]) != str or len(Settings["confirmation-code"]) == 0:
@@ -149,12 +145,12 @@ CallbackSender = Callback(Settings)
 
 # Обрабатывает запросы от браузера.
 @App.get("/vtp/{Source}")
-def CheckServer(Source: str):
+def CheckServer(Source: str) -> HTMLResponse:
 	# HTML-блок источника.
 	SourceHTML = None
 	
 	# Проверка соответствия источника заданному настройками.
-	if Source == Settings["source"]:
+	if Source in Settings["targets"].keys():
 		# Формирование HTML-контейнера для верного источника.
 		SourceHTML = f"<span style=\"color: green;\">{Source}</span>"
 		# Запись в лог сообщения: выполнена проверка состояния через браузер.
@@ -188,11 +184,11 @@ def CheckServer(Source: str):
 	return HTMLResponse(content = ResponseBody)
 
 # Обрабатывает запросы от серверов ВКонтакте по Callback API. 
-@App.post("/vtp/" + Settings["source"])
-async def SendMessageToGroup(CallbackRequest: Request):
+@App.post("/vtp/{Source}")
+async def SendMessageToGroup(CallbackRequest: Request, Source: str) -> Response:
 	# Парсинг данных запроса в JSON.
 	RequestData = dict(await CallbackRequest.json())
-
+	
 	# Проверка наличия в запросе поля типа.
 	if "type" in RequestData.keys():
 		
@@ -205,10 +201,17 @@ async def SendMessageToGroup(CallbackRequest: Request):
 
 		# Если тип запроса – новый пост.
 		if RequestData["type"] == "wall_post_new":
-			# Запись в лог сообщения: .
-			logging.info("New post with ID: " + str(RequestData["object"]["id"]) + ". Attachments count: " + str(len(RequestData["object"]["attachments"])) + ".")
-			# Добавление поста в буфер отложенной отправки.
-			CallbackSender.AddMessageToBufer(RequestData)
+			
+			# Если задана цель для источника.
+			if Source in Settings["targets"].keys():
+				# Запись в лог сообщения: получен новый пост.
+				logging.info("New post with ID " + str(RequestData["object"]["id"]) + " from source \"" + Source + "\". Attachments count: " + str(len(RequestData["object"]["attachments"])) + ".")
+				# Добавление поста в буфер отложенной отправки.
+				CallbackSender.AddMessageToBufer(RequestData, Source)
+			
+			else:
+				# Запись в лог ошибки: неизвестный источник.
+				logging.error(f"Unknown source: \"{Source}\".")
 
 	else:
 		# Запись в лог ошибки: неподдерживаемый POST-запрос.

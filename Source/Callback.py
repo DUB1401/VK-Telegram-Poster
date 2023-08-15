@@ -9,26 +9,8 @@ import telebot
 import os
 import re
 
+# Обработчик запросов Callback API ВКонтакте.
 class Callback:
-    
-    #==========================================================================================#
-	# >>>>> СВОЙСТВА <<<<< #
-	#==========================================================================================#
-
-	# Экзмепляры обработчиков постов.
-	__PostsEditorsThreads = list()
-	# Очередь отложенных сообщений.
-	__MessagesBufer = list()
-	# Экземпляр бота.
-	__TelegramBot = None
-	# Глобальные настройки.
-	__Settings = dict()
-	# Поток отправки сообщений.
-	__Sender = None
-
-	#==========================================================================================#
-	# >>>>> МЕТОДЫ <<<<< #
-	#==========================================================================================#
 
 	# Очищает сообщение от упоминаний в тегах ВКонтакте.
 	def __CleanTags(self, Post: str) -> str:
@@ -191,19 +173,19 @@ class Callback:
 							)
 
 				try:
-
+					
 					# Если есть вложения.
 					if len(MediaGroup) > 0:
 						# Отправка медиа группы.
-						self.__TelegramBot.send_media_group(
-							self.__Settings["target-id"], 
+						self.__TelegramBots[self.__MessagesBufer[0]["source"]].send_media_group(
+							self.__MessagesBufer[0]["target"], 
 							media = MediaGroup
 						)
 
 					else:
 						# Отправка текстового сообщения.
-						self.__TelegramBot.send_message(
-							self.__Settings["target-id"], 
+						self.__TelegramBots[self.__MessagesBufer[0]["source"]].send_message(
+							self.__MessagesBufer[0]["target"], 
 							self.__MessagesBufer[0]["text"], 
 							parse_mode = self.__Settings["parse-mode"], 
 							disable_web_page_preview = self.__Settings["disable-web-page-preview"]
@@ -234,11 +216,13 @@ class Callback:
 				break
 
 	# Отправляет сообщение в группу Telegram через буфер ожидания.
-	def __SendMessage(self, PostObject: dict):
+	def __SendMessage(self, PostObject: dict, Source: str):
 		# Состояние: есть ли запрещённые слова в посте.
 		HasBlacklistWords = False
 		# Объект сообщения.
 		MessageStruct = {
+			"source": Source,
+			"target": self.__Settings["targets"][Source],
 			"text": None,
 			"attachments": list()
 		}
@@ -248,7 +232,7 @@ class Callback:
 			PostObject["text"] = self.__EscapeCharacters(PostObject["text"])
 
 		# Обработка текста поста пользовательским скриптом.
-		PostObject["text"] = MessageEditor(PostObject["text"])
+		PostObject["text"] = MessageEditor(PostObject["text"], Source)
 
 		# Если включена очистка тегов, то удалить упоминания из них.
 		if self.__Settings["clean-tags"] == True:
@@ -288,19 +272,28 @@ class Callback:
 	# Конструктор: задаёт глобальные настройки и тело Callback-запроса.
 	def __init__(self, Settings: dict):
 
-		#---> Генерация свойств.
+		#---> Генерация динамических свойств.
 		#==========================================================================================#
-		self.__Settings = Settings
-		self.__TelegramBot = telebot.TeleBot(Settings["token"])
+		# Экзмепляры обработчиков постов.
+		self.__PostsEditorsThreads = list()
+		# Очередь отложенных сообщений.
+		self.__MessagesBufer = list()
+		# Список экземпляров бота.
+		self.__TelegramBots = dict()
+		# Глобальные настройки.
+		self.__Settings = Settings.copy()
+		# Поток отправки сообщений.
 		self.__Sender = Thread(target = self.__SenderThread)
 
 		# Запуск потока обработки буфера сообщений.
 		self.__Sender.start()
 		
+		# Инициализация экзепляров бота.
+		for Target in self.__Settings["tokens"].keys():
+			self.__TelegramBots[Target] = telebot.TeleBot(self.__Settings["tokens"][Target])
+		
 	# Добавляет сообщение в очередь отправки.
-	def AddMessageToBufer(self, CallbackRequest: dict):
-		# Сохранение тела запроса.
-		self.__CallbackRequest = CallbackRequest
+	def AddMessageToBufer(self, CallbackRequest: dict, Source: str):
 
 		# Проверка работы потоков.
 		for Index in range(0, len(self.__PostsEditorsThreads)):
@@ -310,6 +303,6 @@ class Callback:
 				self.__PostsEditorsThreads.pop(Index)
 
 		# Добавление потока обработчика поста в список.
-		self.__PostsEditorsThreads.append(Thread(target = self.__SendMessage, args = (CallbackRequest["object"],)))
+		self.__PostsEditorsThreads.append(Thread(target = self.__SendMessage, args = (CallbackRequest["object"], Source)))
 		# Запуск потока обработчика поста в список.
 		self.__PostsEditorsThreads[-1].start()
