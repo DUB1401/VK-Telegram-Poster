@@ -1,33 +1,29 @@
 #!/usr/bin/python
 
+from dublib.Methods import CheckPythonMinimalVersion, MakeRootDirectories, ReadJSON
 from starlette.responses import HTMLResponse, Response
+from Source.Configurator import Configurator
 from starlette.requests import Request
 from Source.Callback import Callback
 from fastapi import FastAPI
 
 import datetime
 import logging
-import json
 import sys
 import os
 
 #==========================================================================================#
-# >>>>> ПРОВЕРКА ВЕРСИИ PYTHON <<<<< #
+# >>>>> ИНИЦИАЛИЗАЦИЯ СКРИПТА <<<<< #
 #==========================================================================================#
 
-# Минимальная требуемая версия Python.
-PythonMinimalVersion = (3, 10)
-# Проверка соответствия.
-if sys.version_info < PythonMinimalVersion:
-	sys.exit("Python %s.%s or later is required.\n" % PythonMinimalVersion)
+# Проверка поддержки используемой версии Python.
+CheckPythonMinimalVersion(3, 10)
+# Создание папок в корневой директории.
+MakeRootDirectories(["Logs"])
 
 #==========================================================================================#
-# >>>>> ИНИЦИАЛИЗАЦИЯ ЛОГГИРОВАНИЯ <<<<< #
+# >>>>> НАСТРОЙКА ЛОГГИРОВАНИЯ <<<<< #
 #==========================================================================================#
-
-# Если нет папки для логов, то создать.
-if os.path.isdir("Logs") == False:
-	os.makedirs("Logs")
 
 # Получение текущей даты.
 CurrentDate = datetime.datetime.now()
@@ -42,7 +38,7 @@ logging.basicConfig(filename = LogFilename, encoding = "utf-8", level = logging.
 #==========================================================================================#
 
 # Версия скрипта.
-Version = "1.0.0"
+Version = "1.1.0"
 # Текст копирайта.
 Copyright = "Copyright © DUB1401. 2022-2023."
 # Обработчик запросов FastAPI.
@@ -70,69 +66,24 @@ Settings = {
 logging.info("====== VK-Telegram Poster v" + Version + " ======")
 # Запись в лог сообщения: используемая версия Python и платформа.
 logging.info("Starting with Python " + str(sys.version_info.major) + "." + str(sys.version_info.minor) + "." + str(sys.version_info.micro) + " on " + str(sys.platform) + ".")
+# Чтение настроек.
+Settings = ReadJSON("Settings.json")
 
-# Проверка доступности файла настроек.
-if os.path.exists("Settings.json"):
+# Если включён отладочный режим.
+if Settings["debug"] == True:
+	# Запись в лог сообщения: включён отладочный режим.
+	logging.info("Debug mode enabled.")
+	# Установка уровня логгирования на DEBUG.
+	logging.getLogger().setLevel(logging.DEBUG)
 
-	# Открытие файла настроек.
-	with open("Settings.json", encoding = "utf-8") as FileRead:
-		# Чтение настроек.
-		Settings = json.load(FileRead)
-		# Списки ключей токенов и целей.
-		Tokens = list(Settings["tokens"].keys())
-		Targets = list(Settings["targets"].keys())
-		# Сортировка ключей.
-		Tokens.sort()
-		Targets.sort()
-		
-		# Если списки целей и токенов не соответствуют.
-		if Tokens != Targets:
-			raise Exception("lists of tokens and targets not match")
-
-		# Если отсутствует кода подтверждения сервера.
-		if type(Settings["confirmation-code"]) != str or len(Settings["confirmation-code"]) == 0:
-			# Установка информирующего сообщения.
-			Settings["confirmation-code"] = "Confirmation code not found in settings file."
-			# Запись в лог отладочной информации: отсутствует код подтверждения сервера.
-			logging.debug("Confirmation code not found in settings file.")
-
-		# Запись в лог сообщения: статус очистки тегов ВКонтакте.
-		if Settings["clean-tags"] == True:
-			logging.info("Tags cleaning: ON.")
-		else:
-			logging.info("Tags cleaning: OFF.")
-
-		# Запись в лог сообщения: статус предпросмотра WEB-содержимого.
-		if Settings["disable-web-page-preview"] == True:
-			logging.info("WEB page preview: OFF.")
-		else:
-			logging.info("WEB page preview: ON.")
-
-		# Запись в лог сообщения: режим разметки поста.
-		if Settings["parse-mode"] != None:
-			logging.info("Parse mode: \"" + str(Settings["parse-mode"]) + "\".")
-
-		# Если включён отладочный режим.
-		if Settings["debug"] == True:
-			# Запись в лог сообщения: включён отладочный режим.
-			logging.info("Debug mode enabled.")
-			# Установка уровня логгирования на DEBUG.
-			logging.getLogger().setLevel(logging.DEBUG)
-
-		# Если логгирование отключено.
-		if Settings["logging"] == False:
-			# Отключение текущего логгирования.
-			logging.shutdown()
-			# Удаление лога.
-			os.remove(LogFilename)
-			# Отключение будущего логгирования.
-			logging.disable(logging.CRITICAL)
-
-else:
-	# Запись в лог ошибки: не найден файл настроек.
-	logging.error("Settings.json file not found.")
-	# Выбро исключения.
-	raise Exception("Settings.json file not found.")
+# Если логгирование отключено.
+if Settings["logging"] == False:
+	# Отключение текущего логгирования.
+	logging.shutdown()
+	# Удаление лога.
+	os.remove(LogFilename)
+	# Отключение будущего логгирования.
+	logging.disable(logging.CRITICAL)
 
 #==========================================================================================#
 # >>>>> ОБРАБОТКА ЗАПРОСОВ <<<<< #
@@ -140,8 +91,10 @@ else:
 
 # Запись в лог сообщения: заголовок раздела прослушивания запросов.
 logging.info("====== Listen ======")
+# Инициализация менеджера конфигураций.
+ConfiguratorObject = Configurator()
 # Обработчик Callback-запросов.
-CallbackSender = Callback(Settings)
+CallbackSender = Callback(Settings, ConfiguratorObject)
 
 # Обрабатывает запросы от браузера.
 @App.get("/vtp/{Source}")
@@ -150,7 +103,7 @@ def CheckServer(Source: str) -> HTMLResponse:
 	SourceHTML = None
 	
 	# Проверка соответствия источника заданному настройками.
-	if Source in Settings["targets"].keys():
+	if Source in ConfiguratorObject.getConfigsNames():
 		# Формирование HTML-контейнера для верного источника.
 		SourceHTML = f"<span style=\"color: green;\">{Source}</span>"
 		# Запись в лог сообщения: выполнена проверка состояния через браузер.
@@ -203,7 +156,7 @@ async def SendMessageToGroup(CallbackRequest: Request, Source: str) -> Response:
 		if RequestData["type"] == "wall_post_new":
 			
 			# Если задана цель для источника.
-			if Source in Settings["targets"].keys():
+			if Source in ConfiguratorObject.getConfigsNames():
 				# Запись в лог сообщения: получен новый пост.
 				logging.info("New post with ID " + str(RequestData["object"]["id"]) + " from source \"" + Source + "\". Attachments count: " + str(len(RequestData["object"]["attachments"])) + ".")
 				# Добавление поста в буфер отложенной отправки.

@@ -1,4 +1,5 @@
 from telebot.types import InputMediaDocument, InputMediaPhoto, InputMediaVideo
+from Source.Configurator import Configurator
 from MessageEditor import MessageEditor
 from threading import Thread
 from time import sleep
@@ -38,15 +39,15 @@ class Callback:
 		return Post
 
 	# Получает URL вложения и загружает его.
-	def __GetAttachements(self, PostAttachements: dict) -> list:
+	def __GetAttachements(self, PostAttachements: dict, Source: str) -> list:
 		# Список вложений.
 		Attachements = list()
 		# Список поддерживаемых вложений.
 		SupportedTypes = list()
 
 		# Формирование списка включённых вложений.
-		for Type in self.__Settings["attachments"].keys():
-			if self.__Settings["attachments"][Type] == True:
+		for Type in self.__Configurations.getAttachments(Source).keys():
+			if self.__Configurations.getAttachments(Source)[Type] == True:
 				SupportedTypes.append(Type)
 
 		# Если нет папки для хранения вложений, то создать.
@@ -146,7 +147,7 @@ class Callback:
 								InputMediaDocument(
 									open("Temp/" + self.__MessagesBufer[0]["attachments"][Index]["filename"], "rb"), 
 									caption = self.__MessagesBufer[0]["text"] if Index == 0 else "",
-									parse_mode = self.__Settings["parse-mode"] if Index == 0 else None
+									parse_mode = self.__Configurations.getConfig(self.__MessagesBufer[0]["source"])["parse-mode"] if Index == 0 else None
 								)
 							)
 
@@ -157,7 +158,7 @@ class Callback:
 								InputMediaPhoto(
 									open("Temp/" + self.__MessagesBufer[0]["attachments"][Index]["filename"], "rb"), 
 									caption = self.__MessagesBufer[0]["text"] if Index == 0 else "",
-									parse_mode = self.__Settings["parse-mode"] if Index == 0 else None
+									parse_mode = self.__Configurations.getConfig(self.__MessagesBufer[0]["source"])["parse-mode"] if Index == 0 else None
 								)
 							)
 
@@ -168,7 +169,7 @@ class Callback:
 								InputMediaVideo(
 									open("Temp/" + self.__MessagesBufer[0]["attachments"][Index]["filename"], "rb"), 
 									caption = self.__MessagesBufer[0]["text"] if Index == 0 else "",
-									parse_mode = self.__Settings["parse-mode"] if Index == 0 else None
+									parse_mode = self.__Configurations.getConfig(self.__MessagesBufer[0]["source"])["parse-mode"] if Index == 0 else None
 								)
 							)
 
@@ -187,8 +188,8 @@ class Callback:
 						self.__TelegramBots[self.__MessagesBufer[0]["source"]].send_message(
 							self.__MessagesBufer[0]["target"], 
 							self.__MessagesBufer[0]["text"], 
-							parse_mode = self.__Settings["parse-mode"], 
-							disable_web_page_preview = self.__Settings["disable-web-page-preview"]
+							parse_mode = self.__Configurations.getConfig(self.__MessagesBufer[0]["source"])["parse-mode"], 
+							disable_web_page_preview = self.__Configurations.getConfig(self.__MessagesBufer[0]["source"])["disable-web-page-preview"]
 						)
 					
 				except telebot.apihelper.ApiTelegramException as ExceptionData:
@@ -222,32 +223,32 @@ class Callback:
 		# Объект сообщения.
 		MessageStruct = {
 			"source": Source,
-			"target": self.__Settings["targets"][Source],
+			"target": self.__Configurations.getConfig(Source)["target"],
 			"text": None,
 			"attachments": list()
 		}
 
 		# Экранировать символы при указанной разметке MarkdownV2.
-		if self.__Settings["parse-mode"] == "MarkdownV2":
+		if self.__Configurations.getConfig(Source)["parse-mode"] == "MarkdownV2":
 			PostObject["text"] = self.__EscapeCharacters(PostObject["text"])
 
 		# Обработка текста поста пользовательским скриптом.
 		PostObject["text"] = MessageEditor(PostObject["text"], Source)
+		
+		# Для каждого запрещённого слова проверить соответствие словам поста.
+		for ForbiddenWord in self.__Configurations.getConfig(Source)["blacklist"]:
+			for Word in PostObject["text"].split():
+
+				# Если пост содержит запрещённое слово, то игнорировать его.
+				if ForbiddenWord.lower() == Word.lower():
+					HasBlacklistWords = True
 
 		# Если сообщение не игнорируется.
 		if PostObject["text"] != None and PostObject["text"] != "" and HasBlacklistWords == False:
 			
 			# Если включена очистка тегов, то удалить упоминания из них.
-			if self.__Settings["clean-tags"] == True:
+			if self.__Configurations.getConfig(Source)["clean-tags"] == True:
 				PostObject["text"] = self.__CleanTags(PostObject["text"])
-
-			# Для каждого запрещённого слова проверить соответствие словам поста.
-			for ForbiddenWord in self.__Settings["blacklist"]:
-				for Word in PostObject["text"].split():
-
-					# Если пост содержит запрещённое слово, то игнорировать его.
-					if ForbiddenWord.lower() == Word.lower():
-						HasBlacklistWords = True
 
 			# Обрезка текста поста до максимально дозволенной длинны.
 			PostObject["text"] = PostObject["text"][:4096]
@@ -256,14 +257,14 @@ class Callback:
 			
 			# Если есть вложения.
 			if len(PostObject["attachments"]) > 0:
-				MessageStruct["attachments"] = self.__GetAttachements(PostObject["attachments"])
+				MessageStruct["attachments"] = self.__GetAttachements(PostObject["attachments"], Source)
 			
 			# Помещение поста в очередь на отправку.
 			self.__MessagesBufer.append(MessageStruct)
 
 		else:
 			# Запись в лог отладочной информации: пост был проигнорирован.
-			logging.debug("Post " + str(PostObject["id"]) + " was ignored.")
+			logging.info("Post with ID " + str(PostObject["id"]) + " was ignored.")
 
 		# Активировать поток отправки, если не активен.
 		if self.__Sender.is_alive() == False:
@@ -271,10 +272,12 @@ class Callback:
 			self.__Sender.start()
 		
 	# Конструктор: задаёт глобальные настройки и тело Callback-запроса.
-	def __init__(self, Settings: dict):
+	def __init__(self, Settings: dict, ConfiguratorObject: Configurator):
 
 		#---> Генерация динамических свойств.
 		#==========================================================================================#
+		# Конфигурации.
+		self.__Configurations = ConfiguratorObject
 		# Экзмепляры обработчиков постов.
 		self.__PostsEditorsThreads = list()
 		# Очередь отложенных сообщений.
@@ -285,13 +288,13 @@ class Callback:
 		self.__Settings = Settings.copy()
 		# Поток отправки сообщений.
 		self.__Sender = Thread(target = self.__SenderThread)
-
+		
 		# Запуск потока обработки буфера сообщений.
 		self.__Sender.start()
 		
 		# Инициализация экзепляров бота.
-		for Target in self.__Settings["tokens"].keys():
-			self.__TelegramBots[Target] = telebot.TeleBot(self.__Settings["tokens"][Target])
+		for Target in self.__Configurations.getConfigsNames():
+			self.__TelegramBots[Target] = telebot.TeleBot(self.__Configurations.getToken(Target))
 		
 	# Добавляет сообщение в очередь отправки.
 	def AddMessageToBufer(self, CallbackRequest: dict, Source: str):

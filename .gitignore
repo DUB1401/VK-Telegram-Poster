@@ -3,9 +3,13 @@ VK-Telegram Poster.pyproj
 VK-Telegram Poster.sln
 .vs
 
-# Python cache.
-__pycache__
-
 # Work folders.
+Config/*
 Logs
 Temp
+
+# Don't ignore config example.
+!Config/Example.json
+
+# Python cache.
+__pycache__

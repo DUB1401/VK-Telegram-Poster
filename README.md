@@ -7,9 +7,10 @@
 
 ## Порядок установки и использования
 1. Загрузить последний релиз. Распаковать.
-2. Установить Python версии не старше 3.10. Если основная версия Python вашего сервера ниже, указать целевую платформу путём редактирования первой строки в файле _vtp.py_ (_#!/usr/bin/python_ → _#!/usr/bin/python3.x_).
-3. В среду исполнения установить следующие пакеты: [pyTelegramBotAPI](https://github.com/eternnoir/pyTelegramBotAPI), [fastapi](https://github.com/tiangolo/fastapi), [uvicorn](https://github.com/encode/uvicorn).
+2. Установить Python версии не старше 3.10.
+3. В среду исполнения установить следующие пакеты: [dublib](https://github.com/DUB1401/dublib), [pyTelegramBotAPI](https://github.com/eternnoir/pyTelegramBotAPI), [fastapi](https://github.com/tiangolo/fastapi), [uvicorn](https://github.com/encode/uvicorn).
 ```
+pip install git+https://github.com/DUB1401/dublib#egg=dublib
 pip install pyTelegramBotAPI
 pip install fastapi
 pip install uvicorn
@@ -18,36 +19,32 @@ pip install uvicorn
 ```
 pip install -r requirements.txt
 ```
-4. Настроить скрипт путём редактирования _Settings.json_. Для добавления пользовательского скрипта обработки постов можно внести изменения в файл _MessageEditor.py_.
-5. При необходимости, например в случае использования скрипта на хостинге активного сайта, настроить переадресацию [nginx](https://nginx.org/) на свободный порт.
-6. Провести валидацию сервера согласно данному [руководству](https://dev.vk.com/api/callback/getting-started#%D0%9F%D0%BE%D0%B4%D0%BA%D0%BB%D1%8E%D1%87%D0%B5%D0%BD%D0%B8%D0%B5%20Callback%20API). Код подтверждения перед верификацией занести в файл настроек _Settings.json_. По умолчанию скрипт слушает `{HOST}/vtp/vk-group-wall`.
-7. Открыть директорию со скриптом в терминале. Можно использовать метод `cd` и прописать путь к папке, либо запустить терминал из проводника. Активировать автопостер командой `uvicorn vtp:App --host {IP} --port {PORT}`.
-8. Для автоматического запуска службы рекомендуется провести инициализацию скрипта через [systemd](https://github.com/systemd/systemd) (пример [здесь](https://github.com/DUB1401/VK-Telegram-Poster/tree/main/systemd)) на Linux или путём добавления его в автозагрузку на Windows.
+4. Создать в папке _Config_ файл конфигурации по предоставленному примеру (см. [здесь](#конфигурация-источника)).
+5. Настроить автопостер путём редактирования _Settings.json_. Для добавления пользовательского скрипта обработки постов можно внести изменения в файл _MessageEditor.py_.
+6. При необходимости, например в случае использования скрипта на хостинге активного сайта, настроить переадресацию [nginx](https://nginx.org/) на свободный порт.
+7. Провести валидацию сервера согласно данному [руководству](https://dev.vk.com/api/callback/getting-started#%D0%9F%D0%BE%D0%B4%D0%BA%D0%BB%D1%8E%D1%87%D0%B5%D0%BD%D0%B8%D0%B5%20Callback%20API). Код подтверждения перед верификацией занести в файл настроек _Settings.json_.
+8. Открыть директорию со скриптом в терминале. Можно использовать метод `cd` и прописать путь к папке, либо запустить терминал из проводника. Активировать автопостер командой `uvicorn vtp:App --host {IP} --port {PORT}`.
+9. Для автоматического запуска службы рекомендуется провести инициализацию скрипта через [systemd](https://github.com/systemd/systemd) (пример [здесь](https://github.com/DUB1401/VK-Telegram-Poster/tree/main/systemd)) на Linux или путём добавления его в автозагрузку на Windows.
 
 ## Версии поставляемых бинарных файлов
 | Файл    | Версия                        | Источник                                                           |
 |---------|-------------------------------|--------------------------------------------------------------------|
 | yt-dlp  | _2023.07.06_                  | [ссылка](https://github.com/yt-dlp/yt-dlp/releases/tag/2023.07.06) |
 
-# Settings.json
-```JSON
-"tokens": {
-	"vk-group-wall": "{TELEGRAM_BOT_TOKEN}"
-}
-```
-Сюда необходимо занести токены ботов Telegram (можно узнать у [BotFather](https://t.me/BotFather)). Ключём должен являться уникальный источник, использующийся для прослушивания Callback-запросов и соответствующий таковому в поле `targets`.
+# Конфигурация источника
+Для добавления новой конфигурации создайте копию файла _Example.json_ и переименуйте её согласно источнику. Источник указывает конечную часть URI, использующегося для прослушивания Callback-запросов. 
+
+**Пример:** `{HOST}/vtp/{SOURCE}`
 ___
 ```JSON
-"targets": {
-	"vk-group-wall": "{GROUP_OR_CHANNEL_ID}"
-}
+"token": ""
 ```
-Сюда необходимо занести ID групп или каналов Telegram (можно получить у [Chat ID Bot](https://t.me/chat_id_echo_bot)). Ключём должен являться уникальный источник, использующийся для прослушивания Callback-запросов и соответствующий таковому в поле `tokens`.
+Сюда необходимо занести токен бота Telegram (можно получить у [BotFather](https://t.me/BotFather)). Токен должен быть уникальным для каждого источника.
 ___
 ```JSON
-"source": "vk-group-wall"
+"target": ""
 ```
-Указывает конечную часть URI, использующегося для прослушивания Callback-запросов. По умолчанию скрипт слушает `{HOST}/vtp/vk-group-wall`.
+Сюда необходимо занести ID группы или канала Telegram (можно получить у [Chat ID Bot](https://t.me/chat_id_echo_bot)).
 ___
 ```JSON
 "clean-tags": true
@@ -82,7 +79,8 @@ ___
 
 > [!IMPORTANT]  
 > Для пересылки _video_ необходимо, чтобы в сообществе ВКонтакте для раздела «Видео» было установленно значение _Открытые_ или _Ограниченные_.
-___
+
+# Settings.json
 ```JSON
 "confirmation-code": ""
 ```

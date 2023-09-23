@@ -1,18 +1,4 @@
 {
-	"tokens": {
-		"vk-group-wall": "{TELEGRAM_BOT_TOKEN}"
-	},
-	"targets": {
-		"vk-group-wall": "{GROUP_OR_CHANNEL_ID}"
-	},
-	"clean-tags": true,
-	"disable-web-page-preview": true,
-	"blacklist": [],
-	"attachments": {
-		"doc": true,
-		"photo": true,
-		"video": true
-	},
 	"confirmation-code": "",
 	"logging": false,
 	"debug": false
