@@ -1,5 +1,9 @@
 {
+	"login": "",
+	"password": "",
+	"app-id": 2685278,
+	"longpoll-period": 60,
 	"confirmation-code": "",
-	"logging": false,
+	"logging": true,
 	"debug": false
 }

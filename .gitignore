@@ -11,5 +11,8 @@ Temp
 # Don't ignore config example.
 !Config/Example.json
 
+# VK coockies.
+vk_config.v2.json
+
 # Python cache.
 __pycache__

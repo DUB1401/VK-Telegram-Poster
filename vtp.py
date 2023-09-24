@@ -12,6 +12,8 @@ import logging
 import sys
 import os
 
+from Source.LongPoll import LongPoll
+
 #==========================================================================================#
 # >>>>> ИНИЦИАЛИЗАЦИЯ СКРИПТА <<<<< #
 #==========================================================================================#
@@ -19,7 +21,7 @@ import os
 # Проверка поддержки используемой версии Python.
 CheckPythonMinimalVersion(3, 10)
 # Создание папок в корневой директории.
-MakeRootDirectories(["Logs"])
+MakeRootDirectories(["Logs", "Temp"])
 
 #==========================================================================================#
 # >>>>> НАСТРОЙКА ЛОГГИРОВАНИЯ <<<<< #
@@ -32,13 +34,15 @@ LogFilename = "Logs/" + str(CurrentDate)[:-7] + ".log"
 LogFilename = LogFilename.replace(':', '-')
 # Установка конфигнурации и формата.
 logging.basicConfig(filename = LogFilename, encoding = "utf-8", level = logging.INFO, format = "%(asctime)s %(levelname)s: %(message)s", datefmt = "%Y-%m-%d %H:%M:%S")
+# Отключение части сообщений логов библиотеки vk_api.
+logging.getLogger("vk_api").setLevel(logging.CRITICAL)
 
 #==========================================================================================#
 # >>>>> ЧТЕНИЕ НАСТРОЕК <<<<< #
 #==========================================================================================#
 
 # Версия скрипта.
-Version = "1.1.0"
+Version = "1.2.0"
 # Текст копирайта.
 Copyright = "Copyright © DUB1401. 2022-2023."
 # Обработчик запросов FastAPI.
@@ -89,87 +93,95 @@ if Settings["logging"] == False:
 # >>>>> ОБРАБОТКА ЗАПРОСОВ <<<<< #
 #==========================================================================================#
 
-# Запись в лог сообщения: заголовок раздела прослушивания запросов.
-logging.info("====== Listen ======")
 # Инициализация менеджера конфигураций.
 ConfiguratorObject = Configurator()
-# Обработчик Callback-запросов.
-CallbackSender = Callback(Settings, ConfiguratorObject)
+# Количество модулей с требуемыми типами API.
+RequiredAPI = ConfiguratorObject.getRequiredAPI()
+# Запись в лог сообщения: заголовок раздела обработки запросов.
+logging.info("====== Working ======")
 
-# Обрабатывает запросы от браузера.
-@App.get("/vtp/{Source}")
-def CheckServer(Source: str) -> HTMLResponse:
-	# HTML-блок источника.
-	SourceHTML = None
+# Если требуется обработка Callback API.
+if RequiredAPI["Callback"] > 0:
+	# Обработчик Callback-запросов.
+	CallbackSender = Callback(Settings, ConfiguratorObject)
+
+	# Обрабатывает запросы от браузера.
+	@App.get("/vtp/{Source}")
+	def CheckServer(Source: str) -> HTMLResponse:
+		# HTML-блок источника.
+		SourceHTML = None
 	
-	# Проверка соответствия источника заданному настройками.
-	if Source in ConfiguratorObject.getConfigsNames():
-		# Формирование HTML-контейнера для верного источника.
-		SourceHTML = f"<span style=\"color: green;\">{Source}</span>"
-		# Запись в лог сообщения: выполнена проверка состояния через браузер.
-		logging.info(f"Source validation: \"{Source}\". Correct.")
-	else:
-		# Формирование HTML-контейнера для неверного источника.
-		SourceHTML = f"<span style=\"color: red;\">{Source}</span>"
-		# Запись в лог предупреждения: при проверке состояния указан неверный источник.
-		logging.warning(f"Source validation: \"{Source}\". Uncorrect.")
+		# Проверка соответствия источника заданному настройками.
+		if Source in ConfiguratorObject.getConfigsNames():
+			# Формирование HTML-контейнера для верного источника.
+			SourceHTML = f"<span style=\"color: green;\">{Source}</span>"
+			# Запись в лог сообщения: выполнена проверка состояния через браузер.
+			logging.info(f"[Callback API] Source validation: \"{Source}\". Correct.")
+		else:
+			# Формирование HTML-контейнера для неверного источника.
+			SourceHTML = f"<span style=\"color: red;\">{Source}</span>"
+			# Запись в лог предупреждения: при проверке состояния указан неверный источник.
+			logging.warning(f"[Callback API] Source validation: \"{Source}\". Uncorrect.")
 
 	
 
-	# HTML-тело ответа для браузера.
-	ResponseBody = f"""
-		<html>
-			<head>
-				<title>VK-Telegram Poster</title>
-				<link rel="icon" href="https://web.telegram.org/a/favicon.svg" type="image/svg+xml">
-			</head>
-			<body style="background-color: #0E1010; color: #D4CDF5;">
-				<span style="font-size: 200%;">VK-Telegram Poster</span><br>
-				<b>Source:</b> {SourceHTML}<br>
-				<b>Version:</b> {Version}<br>
-				<b>Status:</b> <span style="color: green;">200 OK</span><br>
-				<br>
-				{Copyright} | <a href="https://github.com/DUB1401/VK-Telegram-Poster" style="text-decoration: none; color: #F5E3CD;">GitHub</a><br>
-			</body>
-		</html>
-	"""
+		# HTML-тело ответа для браузера.
+		ResponseBody = f"""
+			<html>
+				<head>
+					<title>VK-Telegram Poster</title>
+					<link rel="icon" href="https://web.telegram.org/a/favicon.svg" type="image/svg+xml">
+				</head>
+				<body style="background-color: #0E1010; color: #D4CDF5;">
+					<span style="font-size: 200%;">VK-Telegram Poster</span><br>
+					<b>Source:</b> {SourceHTML}<br>
+					<b>Version:</b> {Version}<br>
+					<b>Status:</b> <span style="color: green;">200 OK</span><br>
+					<br>
+					{Copyright} | <a href="https://github.com/DUB1401/VK-Telegram-Poster" style="text-decoration: none; color: #F5E3CD;">GitHub</a><br>
+				</body>
+			</html>
+		"""
 
-	return HTMLResponse(content = ResponseBody)
+		return HTMLResponse(content = ResponseBody)
 
-# Обрабатывает запросы от серверов ВКонтакте по Callback API. 
-@App.post("/vtp/{Source}")
-async def SendMessageToGroup(CallbackRequest: Request, Source: str) -> Response:
-	# Парсинг данных запроса в JSON.
-	RequestData = dict(await CallbackRequest.json())
+	# Обрабатывает запросы от серверов ВКонтакте по Callback API. 
+	@App.post("/vtp/{Source}")
+	async def SendMessageToGroup(CallbackRequest: Request, Source: str) -> Response:
+		# Парсинг данных запроса в JSON.
+		RequestData = dict(await CallbackRequest.json())
 	
-	# Проверка наличия в запросе поля типа.
-	if "type" in RequestData.keys():
+		# Проверка наличия в запросе поля типа.
+		if "type" in RequestData.keys():
 		
-		# Если тип запроса – подтверждение сервера.
-		if RequestData["type"] == "confirmation":
-			# Запись в лог сообщения: запрос кода подтверждения сервера.
-			logging.info("Confirmation code requested: \"" + Settings["confirmation-code"] + "\".")
+			# Если тип запроса – подтверждение сервера.
+			if RequestData["type"] == "confirmation":
+				# Запись в лог сообщения: запрос кода подтверждения сервера.
+				logging.info("[Callback API] Confirmation code requested: \"" + Settings["confirmation-code"] + "\".")
 
-			return Response(content = Settings["confirmation-code"])
+				return Response(content = Settings["confirmation-code"])
 
-		# Если тип запроса – новый пост.
-		if RequestData["type"] == "wall_post_new":
+			# Если тип запроса – новый пост.
+			if RequestData["type"] == "wall_post_new":
 			
-			# Если задана цель для источника.
-			if Source in ConfiguratorObject.getConfigsNames():
-				# Запись в лог сообщения: получен новый пост.
-				logging.info("New post with ID " + str(RequestData["object"]["id"]) + " from source \"" + Source + "\". Attachments count: " + str(len(RequestData["object"]["attachments"])) + ".")
-				# Добавление поста в буфер отложенной отправки.
-				CallbackSender.AddMessageToBufer(RequestData, Source)
+				# Если задана цель для источника.
+				if Source in ConfiguratorObject.getConfigsNames():
+					# Добавление поста в буфер отложенной отправки.
+					CallbackSender.AddMessageToBufer(RequestData, Source)
 			
-			else:
-				# Запись в лог ошибки: неизвестный источник.
-				logging.error(f"Unknown source: \"{Source}\".")
+				else:
+					# Запись в лог ошибки: неизвестный источник.
+					logging.error(f"Unknown source: \"{Source}\".")
 
-	else:
-		# Запись в лог ошибки: неподдерживаемый POST-запрос.
-		logging.error("Unsupported POST-request.")
-		# Выброс исключения.
-		raise Exception("Unsupported POST-request.")
+		else:
+			# Запись в лог ошибки: неподдерживаемый POST-запрос.
+			logging.error("Unsupported POST-request.")
+			# Выброс исключения.
+			raise Exception("Unsupported POST-request.")
 
-	return Response(content = "ok")
+		return Response(content = "ok")
+	
+# Если требуется обработка LongPoll API.
+if RequiredAPI["LongPoll"] > 0:
+	# Обработчик LongPoll-запросов.
+	LongPollSender = LongPoll(Settings, ConfiguratorObject)

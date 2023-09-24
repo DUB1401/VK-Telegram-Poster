@@ -1,20 +1,103 @@
 from telebot.types import InputMediaDocument, InputMediaPhoto, InputMediaVideo
+from dublib.Methods import ReadJSON, WriteJSON
 from Source.Configurator import Configurator
 from MessageEditor import MessageEditor
+from vk_captcha import VkCaptchaSolver
+from vk_api import VkApi, exceptions
+from threading import Thread, Timer
 from Source.Functions import *
-from threading import Thread
 from time import sleep
 
-import logging
 import telebot
 
-# Обработчик запросов Callback API ВКонтакте.
-class Callback:
+# Обработчик запросов LongPoll API ВКонтакте.
+class LongPoll:
+	
+	# Выполняет авторизацию.
+	def __Authorizate(self):
+		# Менеджер обработки каптчи.
+		CaptchaSolver = VkCaptchaSolver(logging = False)
+		# Состояние: решена ли каптча.
+		IsUncaptched = False
+		
+		while IsUncaptched == False:
+			
+			try:
+				# Установка логина, пароля и обработчика каптчи.
+				self.__Session = VkApi(self.__Settings["login"], self.__Settings["password"], app_id = self.__Settings["app-id"], captcha_handler = CaptchaSolver.vk_api_captcha_handler)
+				# Авторизация.
+				self.__Session.auth()
+				
+			except exceptions.AuthError:
+				# Запись в лог предупреждения: попытка решить каптчу.
+				logging.warning("[LongPoll API] Captcha requested. Trying to resolve...")
+				
+			else:
+				# Переключение состояния решения каптчи.
+				IsUncaptched = True
+				
+		# Получение экземпляра API.
+		self.__API = self.__Session.get_api()
 
+	# Возвращает список постов.
+	def __GetPosts(self, WallID: str, PostsCount: int = 20, Offset: int = 0) -> list[dict]:
+		# Добавление минуса к ID стены.
+		WallID = "-" + str(WallID).strip("-")
+		# Список полученных постов.
+		WallPosts = self.__API.wall.get(owner_id = WallID, count = PostsCount, offset = Offset)["items"]
+		
+		return WallPosts
+	
+	# Возвращает список постов, опубликованных с момента последней проверки.
+	def __GetUpdates(self, ConfigName: str) -> list[dict]:
+		# Состояние: найден ли ранее опубликованный пост.
+		IsUpdated = False
+		# Список вышедших постов.
+		Posts = list()
+		# Получение конфигурации.
+		Config = self.__Configurations.getConfig(ConfigName)
+		# Индекс запроса.
+		RequestIndex = 0
+		
+		# Пока не будет найдено обновление.
+		while IsUpdated == False:
+			# Получение последних 20 постов.
+			Bufer = self.__GetPosts(Config["wall-id"], Offset = 20 * RequestIndex)
+
+			# Если ID последнего отправленного поста записан.
+			if Config["last-post-id"] != None:
+
+				# Для каждого полученного поста.
+				for Post in Bufer:
+				
+					# Если ID обрабатываемого поста меньше или равен ID последнего отправленного поста.
+					if Post["id"] <= Config["last-post-id"]:
+						# Переключить состояние обновления.
+						IsUpdated = True
+				
+					else:
+						# Записать пост.
+						Posts.append(Post)
+						
+			else:
+				# Записать последний пост.
+				Posts.append(Bufer[0])
+				# Переключить состояние обновления.
+				IsUpdated = True
+					
+			# Инкремент индекса запроса.
+			RequestIndex += 1
+			
+			# Если ожидается ещё один запрос, выждать время.
+			if IsUpdated == False:
+				sleep(5)
+
+		return Posts	
+	
 	# Обрабатывает очередь сообщений.
 	def __SenderThread(self):
 		# Запись в лог отладочной информации: поток очереди отправки запущен.
-		logging.debug("Callback API sender thread started.")
+		logging.debug("LongPoll API sender thread started.")
 
 		# Пока сообщение не отправлено.
 		while True:
@@ -170,15 +253,27 @@ class Callback:
 		else:
 			# Запись в лог отладочной информации: пост был проигнорирован.
 			logging.info(f"Source: \"{Source}\". Post with ID " + str(PostObject["id"]) + " was ignored.")
+			
+		# Запись ID последнего отправленного поста в конфигурацию.
+		self.__WriteLastPostID(Source, PostObject["id"])
 
 		# Активировать поток отправки, если не активен.
 		if self.__Sender.is_alive() == False:
-			self.__Sender = Thread(target = self.__SenderThread, name = "VK-Telegram Poster (Callback API sender)")
+			self.__Sender = Thread(target = self.__SenderThread, name = "VK-Telegram Poster (LongPoll API sender)")
 			self.__Sender.start()
-		
+			
+	# Записывает ID последнего отправленного поста.
+	def __WriteLastPostID(self, Source: str, ID: int):
+		# Чтение конфигурации.
+		Config = ReadJSON(f"Config/{Source}.json")
+		# Обновление ID.
+		Config["last-post-id"] = ID
+		# Запись обновлённой конфигурации.
+		WriteJSON(f"Config/{Source}.json", Config)
+
 	# Конструктор: задаёт глобальные настройки и обработчик конфигураций.
 	def __init__(self, Settings: dict, ConfiguratorObject: Configurator):
-
+	
 		#---> Генерация динамических свойств.
 		#==========================================================================================#
 		# Поток отправки сообщений.
@@ -193,18 +288,33 @@ class Callback:
 		self.__MessagesBufer = list()
 		# Список экземпляров бота.
 		self.__TelegramBots = dict()
+		# Сессия ВКонтакте.
+		self.__Session = None  
+		# Обработчик повторов.
+		self.__Repiter = None
+		# Экземпляр API.
+		self.__API = None
 		
+		# Авторизация и получение API.
+		self.__Authorizate()
 		# Запуск потока обработки буфера сообщений.
 		self.__Sender.start()
 		
 		# Инициализация экзепляров бота.
-		for Target in self.__Configurations.getConfigsNames("Callback"):
+		for Target in self.__Configurations.getConfigsNames("LongPoll"):
 			self.__TelegramBots[Target] = telebot.TeleBot(self.__Configurations.getToken(Target))
-		
-	# Добавляет сообщение в очередь отправки.
-	def AddMessageToBufer(self, CallbackRequest: dict, Source: str):
-		# Запись в лог сообщения: получен новый пост.
-		logging.info(f"Source: \"{Source}\". New post with ID " + str(CallbackRequest["object"]["id"]) + ".")
+			
+		# Немедленная проверка новых постов и активация таймера.
+		self.CheckUpdates()
+			
+	# Интервально проверяет обновления и добавляет сообщения в очередь отправки.
+	def CheckUpdates(self):
+		# Обновление конфигураций с LongPoll API.
+		self.__Configurations.updateLongPollConfigs()
+		# Получение списка конфигураций, использующих LongPoll API.
+		Configs = self.__Configurations.getConfigsNames("LongPoll")
+		# Количество новых постов.
+		NewPostsCount = 0
 		
 		# Проверка работы потоков.
 		for Index in range(0, len(self.__PostsEditorsThreads)):
@@ -212,8 +322,25 @@ class Callback:
 			# Если поток завершил работу, то удалить его из списка.
 			if self.__PostsEditorsThreads[Index].is_alive() == False:
 				self.__PostsEditorsThreads.pop(Index)
-
-		# Добавление потока обработчика поста в список.
-		self.__PostsEditorsThreads.append(Thread(target = self.__SendMessage, args = (CallbackRequest["object"], Source)))
-		# Запуск потока обработчика поста в список.
-		self.__PostsEditorsThreads[-1].start()
+		
+		# Для каждой конфигурации.
+		for Source in Configs:
+			# Получение списка новых постов (инверитрование порядка для обработки в порядке возрастания даты публикации).
+			Posts = list(reversed(self.__GetUpdates(Source)))
+			# Подсчёт количества новых постов.
+			NewPostsCount += len(Posts)
+			
+			# Для каждого поста.
+			for Post in Posts:
+				# Запись в лог сообщения: получен новый пост.
+				logging.info(f"Source: \"{Source}\". New post with ID " + str(Post["id"]) + ".")
+				# Добавление потока обработчика поста в список.
+				self.__PostsEditorsThreads.append(Thread(target = self.__SendMessage, args = (Post, Source)))
+				# Запуск потока обработчика поста в список.
+				self.__PostsEditorsThreads[-1].start()
+				
+		# Запись в лог сообщения: количество обновлённых постов.
+		logging.info(f"[LongPoll API] Updates checked. New posts count: {NewPostsCount}.")
+		# Активация таймера.
+		self.__Repiter = Timer(float(self.__Settings["longpoll-period"] * 60), self.CheckUpdates)
+		self.__Repiter.start()
