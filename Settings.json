@@ -1,7 +1,8 @@
 {
 	"login": "",
 	"password": "",
-	"app-id": 2685278,
+	"app-id": 6287487,
+	"vk-access-token": null,
 	"longpoll-period": 60,
 	"confirmation-code": "",
 	"logging": true,

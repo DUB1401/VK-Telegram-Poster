@@ -10,7 +10,7 @@
 2. Установить Python версии не старше 3.10.
 3. В среду исполнения установить следующие пакеты: [dublib](https://github.com/DUB1401/dublib), [pyTelegramBotAPI](https://github.com/eternnoir/pyTelegramBotAPI), [onnxruntime](https://github.com/microsoft/onnxruntime), [vk_captcha](https://github.com/imartemy1524/vk_captcha), [fastapi](https://github.com/tiangolo/fastapi), [uvicorn](https://github.com/encode/uvicorn), [vk_api](https://github.com/python273/vk_api).
 ```
-pip install git+https://github.com/DUB1401/dublib.git
+pip install git+https://github.com/DUB1401/dublib
 pip install pyTelegramBotAPI
 pip install onnxruntime
 pip install vk_captcha
@@ -34,7 +34,7 @@ pip install -r requirements.txt
 2. Установить Python версии не старше 3.10.
 3. В среду исполнения установить следующие пакеты: [dublib](https://github.com/DUB1401/dublib), [pyTelegramBotAPI](https://github.com/eternnoir/pyTelegramBotAPI), [onnxruntime](https://github.com/microsoft/onnxruntime), [vk_captcha](https://github.com/imartemy1524/vk_captcha), [fastapi](https://github.com/tiangolo/fastapi), [uvicorn](https://github.com/encode/uvicorn), [vk_api](https://github.com/python273/vk_api).
 ```
-pip install git+https://github.com/DUB1401/dublib.git
+pip install git+https://github.com/DUB1401/dublib
 pip install pyTelegramBotAPI
 pip install onnxruntime
 pip install vk_captcha
@@ -192,9 +192,31 @@ ___
 Пароль аккаунта [ВКонтакте](https://vk.com/).
 ___
 ```JSON
-"app-id": 2685278
+"app-id": 6287487
 ```
-Указывает ID приложения для доступа к API. Если у вас не работает авторизация, рекомендуется сменить его.
+Указывает ID приложения для доступа к API. Не рекомендуется изменять.
+___
+```JSON
+"vk-access-token": ""
+```
+
+> [!NOTE]  
+> Данный способ является рекомендуемым для постоянного использования, однако при перезапуске автопостера может потребоваться обновление токена.
+
+Если [ВКонтакте](https://vk.com/) блокирует вашу авторизацию, а каптчу не удаётся решить при помощи AI, вы можете вручную получить токен доступа для вашего аккаунта и выполнять запросы с его использованием. Для этого необходимо выполнить нижеперечисленные шаги:
+
+1. В любом браузере, поддерживающем расширения [Chromium](https://github.com/chromium/chromium), авторизуйтесь в [ВКонтакте](https://vk.com/).
+2. Если вы планируете использовать автопостер на устройстве, IP которого отличается от вашего текущего (например, на собственном сервере), выполняйте шаги по порядку, иначе можете сразу переходить к пункту №8.
+3. Установите на серевере [Squid](https://github.com/squid-cache/squid). Далее пример будет приводиться для CentOS, а дополнительную информацию вы сможете найти [здесь](https://winitpro.ru/index.php/2022/03/17/ustanovka-nastrojka-squid-proxy/).
+4. Настройте [Squid](https://github.com/squid-cache/squid) для приёма пакетов со всех IP путём добавления в файл конфигурации _/etc/squid/squid.conf_ следующих строк:
+```
+acl all src 0.0.0.0/0
+http_access allow all
+```
+5. Перезапустите службу [Squid](https://github.com/squid-cache/squid).
+6. Установите в ваш браузер [это](https://chromewebstore.google.com/detail/proxycontrol-%D0%BC%D0%B5%D0%BD%D0%B5%D0%B4%D0%B6%D0%B5%D1%80-%D0%B4%D0%BB%D1%8F/hjocpjdeacglfchomobaagbmipeggnjg) расширения и в его настройки занесите IP вашего сервера и стандартный прослушиваемый порт – **3128**. Включите расширение.
+7. Откройте в браузере любой [сервис](https://whoer.net/ru), определяющий ваш IP, и убедитесь в том, что прокси работает.
+8. Перейдите на [этот](https://vkhost.github.io/) сайт. Прочитайте краткую инструкцию и нажмите кнопку **vk.com** для получения токена.
 ___
 ```JSON
 "longpoll-period": 60

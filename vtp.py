@@ -73,6 +73,10 @@ logging.info("Starting with Python " + str(sys.version_info.major) + "." + str(s
 # Чтение настроек.
 Settings = ReadJSON("Settings.json")
 
+# Обнуление пустого токена ВКонтакте.
+if Settings["vk-access-token"] == "":
+	Settings["vk-access-token"] = None
+
 # Если включён отладочный режим.
 if Settings["debug"] == True:
 	# Запись в лог сообщения: включён отладочный режим.

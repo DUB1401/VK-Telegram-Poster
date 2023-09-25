@@ -20,17 +20,28 @@ class LongPoll:
 		# Состояние: решена ли каптча.
 		IsUncaptched = False
 		
+		# Пока не будет решена каптча.
 		while IsUncaptched == False:
 			
 			try:
 				# Установка логина, пароля и обработчика каптчи.
-				self.__Session = VkApi(self.__Settings["login"], self.__Settings["password"], app_id = self.__Settings["app-id"], captcha_handler = CaptchaSolver.vk_api_captcha_handler)
-				# Авторизация.
-				self.__Session.auth()
+				self.__Session = VkApi(
+					self.__Settings["login"], 
+					self.__Settings["password"], 
+					app_id = self.__Settings["app-id"], 
+					token = self.__Settings["vk-access-token"],
+					captcha_handler = CaptchaSolver.vk_api_captcha_handler
+				)
 				
-			except exceptions.AuthError:
-				# Запись в лог предупреждения: попытка решить каптчу.
-				logging.warning("[LongPoll API] Captcha requested. Trying to resolve...")
+				# Если токен не используется, то авторизоваться.
+				if self.__Settings["vk-access-token"] == None:
+					self.__Session.auth(token_only = True)
+				
+			except exceptions.AuthError as ExceptionData:	
+				# Запись в лог ошибки: исключение авторизации.
+				logging.error("[LongPoll API] Authorization exception: " + str(ExceptionData).split(" Please")[0])
+				# Выжидание интервала.
+				sleep(5)
 				
 			else:
 				# Переключение состояния решения каптчи.
@@ -253,9 +264,6 @@ class LongPoll:
 		else:
 			# Запись в лог отладочной информации: пост был проигнорирован.
 			logging.info(f"Source: \"{Source}\". Post with ID " + str(PostObject["id"]) + " was ignored.")
-			
-		# Запись ID последнего отправленного поста в конфигурацию.
-		self.__WriteLastPostID(Source, PostObject["id"])
 
 		# Активировать поток отправки, если не активен.
 		if self.__Sender.is_alive() == False:
@@ -315,6 +323,8 @@ class LongPoll:
 		Configs = self.__Configurations.getConfigsNames("LongPoll")
 		# Количество новых постов.
 		NewPostsCount = 0
+		# Список постов.
+		Posts = list()
 		
 		# Проверка работы потоков.
 		for Index in range(0, len(self.__PostsEditorsThreads)):
@@ -339,6 +349,11 @@ class LongPoll:
 				# Запуск потока обработчика поста в список.
 				self.__PostsEditorsThreads[-1].start()
 				
+		
+		# Запись ID последнего отправленного поста в конфигурацию.
+		if len(Posts) > 0:
+			self.__WriteLastPostID(Source, Posts[-1]["id"])
+		
 		# Запись в лог сообщения: количество обновлённых постов.
 		logging.info(f"[LongPoll API] Updates checked. New posts count: {NewPostsCount}.")
 		# Активация таймера.

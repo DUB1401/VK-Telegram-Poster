@@ -1,4 +1,4 @@
-git+https://github.com/DUB1401/dublib.git
+git+https://github.com/DUB1401/dublib
 pyTelegramBotAPI
 onnxruntime
 vk_captcha

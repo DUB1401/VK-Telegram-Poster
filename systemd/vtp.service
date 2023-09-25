@@ -3,8 +3,6 @@
 # {Application Directory} – путь к директории со скриптом.
 # {IP} – статичный белый IP вашего сервера.
 # {PORT} – свободный порт вашего сервера. 
-#==========================================================================================#
-# Copyright © DUB1401. 2022-2023.
 
 [Unit]
 Description=VK-Telegram Poster
@@ -17,7 +15,7 @@ Group=root
 WorkingDirectory={Application Directory}
 ExecStart=/usr/local/bin/uvicorn vtp:App --host {IP} --port {PORT}
 Restart=on-failure
-RestartSec=5
+RestartSec=60
 
 [Install]
 WantedBy=multi-user.target
