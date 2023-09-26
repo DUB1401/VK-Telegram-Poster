@@ -1,0 +1,16 @@
+{
+	"api": "Open",
+	"token": "{TELEGRAM_BOT_TOKEN}",
+	"target": "{GROUP_OR_CHANNEL_ID}",
+	"wall-id": 0,
+	"clean-tags": true,
+	"parse-mode": null,
+	"disable-web-page-preview": true,
+	"blacklist": [],
+	"attachments": {
+		"doc": true,
+		"photo": true,
+		"video": true
+	},
+	"last-post-id": null
+}

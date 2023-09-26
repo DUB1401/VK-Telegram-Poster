@@ -12,7 +12,7 @@ import logging
 import sys
 import os
 
-from Source.LongPoll import LongPoll
+from Source.Open import Open
 
 #==========================================================================================#
 # >>>>> ИНИЦИАЛИЗАЦИЯ СКРИПТА <<<<< #
@@ -185,7 +185,7 @@ if RequiredAPI["Callback"] > 0:
 
 		return Response(content = "ok")
 	
-# Если требуется обработка LongPoll API.
-if RequiredAPI["LongPoll"] > 0:
-	# Обработчик LongPoll-запросов.
-	LongPollSender = LongPoll(Settings, ConfiguratorObject)
+# Если требуется обработка Open API.
+if RequiredAPI["Open"] > 0:
+	# Обработчик Open-запросов.
+	OpenSender = Open(Settings, ConfiguratorObject)

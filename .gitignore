@@ -8,8 +8,9 @@ Config/*
 Logs
 Temp
 
-# Don't ignore config example.
-!Config/Example.json
+# Don't ignore configs examples.
+!Config/# Callback API Example.json
+!Config/# Open API Example.json
 
 # VK coockies.
 vk_config.v2.json

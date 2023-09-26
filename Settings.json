@@ -1,9 +1,9 @@
 {
 	"login": "",
 	"password": "",
-	"app-id": 6287487,
-	"vk-access-token": null,
-	"longpoll-period": 60,
+	"app-id": 6121396,
+	"vk-access-token": "",
+	"openapi-period": 60,
 	"confirmation-code": "",
 	"logging": true,
 	"debug": false

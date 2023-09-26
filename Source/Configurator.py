@@ -12,7 +12,7 @@ class Configurator:
 		# Фильтрация только файлов формата JSON.
 		FilesList = list(filter(lambda x: x.endswith(".json"), FilesList))
 		# Список доступных API.
-		API = ["Callback", "LongPoll"]
+		API = ["Callback", "Open"]
 		# Словарь конфигураций.
 		Configurations = dict()
 		
@@ -65,12 +65,12 @@ class Configurator:
 				if self.__Configurations[Name]["api"].lower() == "callback":
 					Configs.append(Name)
 					
-		# Если запрошен список конфигураций для LongPoll API.
-		elif API_Type.lower() == "longpoll":
+		# Если запрошен список конфигураций для Open API.
+		elif API_Type.lower() == "open":
 			
 			# Для каждой конфигурации проверить соответствие типу API.
 			for Name in self.__Configurations.keys():
-				if self.__Configurations[Name]["api"].lower() == "longpoll":
+				if self.__Configurations[Name]["api"].lower() == "open":
 					Configs.append(Name)
 
 		return Configs
@@ -80,7 +80,7 @@ class Configurator:
 		# Список API.
 		API = {
 			"Callback": 0,
-			"LongPoll": 0
+			"Open": 0
 		}
 		
 		# Для каждой конфигурации.
@@ -90,9 +90,9 @@ class Configurator:
 			if self.__Configurations[ConfigName]["api"].lower() == "callback":
 				API["Callback"] += 1
 				
-			# Если конфигурация требует LongPoll API.
-			if self.__Configurations[ConfigName]["api"].lower() == "longpoll":
-				API["LongPoll"] += 1
+			# Если конфигурация требует Open API.
+			if self.__Configurations[ConfigName]["api"].lower() == "open":
+				API["Open"] += 1
 				
 		return API
 
@@ -111,19 +111,19 @@ class Configurator:
 			
 		return TokensList
 	
-	# Обновляет конфигурации с LongPoll API.
-	def updateLongPollConfigs(self):
-		# Список конфигураций с LongPoll API.
-		LongPollConfigs = list()
+	# Обновляет конфигурации с указанным типом API.
+	def updateConfigs(self, API_Type: str):
+		# Список конфигураций с Open API.
+		OpenConfigs = list()
 
 		# Для каждой конфигурации.
 		for ConfigName in self.__Configurations.keys():
 				
-			# Если конфигурация требует LongPoll API.
-			if self.__Configurations[ConfigName]["api"].lower() == "longpoll":
-				LongPollConfigs.append(ConfigName)
+			# Если конфигурация требует Open API.
+			if self.__Configurations[ConfigName]["api"].lower() == API_Type:
+				OpenConfigs.append(ConfigName)
 		
-		# Для каждого файла конфигурации с LongPoll API.
-		for Filename in LongPollConfigs:
+		# Для каждого файла конфигурации с Open API.
+		for Filename in OpenConfigs:
 			# Прочитать конфигурацию в словарь.
 			self.__Configurations[Filename] = ReadJSON("Config/" + Filename + ".json")

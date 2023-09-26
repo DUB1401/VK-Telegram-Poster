@@ -10,8 +10,8 @@ from time import sleep
 
 import telebot
 
-# Обработчик запросов LongPoll API ВКонтакте.
-class LongPoll:
+# Обработчик запросов Open API ВКонтакте.
+class Open:
 	
 	# Выполняет авторизацию.
 	def __Authorizate(self):
@@ -39,7 +39,7 @@ class LongPoll:
 				
 			except exceptions.AuthError as ExceptionData:	
 				# Запись в лог ошибки: исключение авторизации.
-				logging.error("[LongPoll API] Authorization exception: " + str(ExceptionData).split(" Please")[0])
+				logging.error("[Open API] Authorization exception: " + str(ExceptionData).split(" Please")[0])
 				# Выжидание интервала.
 				sleep(5)
 				
@@ -108,7 +108,7 @@ class LongPoll:
 	# Обрабатывает очередь сообщений.
 	def __SenderThread(self):
 		# Запись в лог отладочной информации: поток очереди отправки запущен.
-		logging.debug("LongPoll API sender thread started.")
+		logging.debug("Open API sender thread started.")
 
 		# Пока сообщение не отправлено.
 		while True:
@@ -267,7 +267,7 @@ class LongPoll:
 
 		# Активировать поток отправки, если не активен.
 		if self.__Sender.is_alive() == False:
-			self.__Sender = Thread(target = self.__SenderThread, name = "VK-Telegram Poster (LongPoll API sender)")
+			self.__Sender = Thread(target = self.__SenderThread, name = "VK-Telegram Poster (Open API sender)")
 			self.__Sender.start()
 			
 	# Записывает ID последнего отправленного поста.
@@ -309,7 +309,7 @@ class LongPoll:
 		self.__Sender.start()
 		
 		# Инициализация экзепляров бота.
-		for Target in self.__Configurations.getConfigsNames("LongPoll"):
+		for Target in self.__Configurations.getConfigsNames("Open"):
 			self.__TelegramBots[Target] = telebot.TeleBot(self.__Configurations.getToken(Target))
 			
 		# Немедленная проверка новых постов и активация таймера.
@@ -317,10 +317,10 @@ class LongPoll:
 			
 	# Интервально проверяет обновления и добавляет сообщения в очередь отправки.
 	def CheckUpdates(self):
-		# Обновление конфигураций с LongPoll API.
-		self.__Configurations.updateLongPollConfigs()
-		# Получение списка конфигураций, использующих LongPoll API.
-		Configs = self.__Configurations.getConfigsNames("LongPoll")
+		# Обновление конфигураций с Open API.
+		self.__Configurations.updateOpenConfigs()
+		# Получение списка конфигураций, использующих Open API.
+		Configs = self.__Configurations.getConfigsNames("Open")
 		# Количество новых постов.
 		NewPostsCount = 0
 		# Список постов.
@@ -355,7 +355,7 @@ class LongPoll:
 			self.__WriteLastPostID(Source, Posts[-1]["id"])
 		
 		# Запись в лог сообщения: количество обновлённых постов.
-		logging.info(f"[LongPoll API] Updates checked. New posts count: {NewPostsCount}.")
+		logging.info(f"[Open API] Updates checked. New posts count: {NewPostsCount}.")
 		# Активация таймера.
-		self.__Repiter = Timer(float(self.__Settings["longpoll-period"] * 60), self.CheckUpdates)
+		self.__Repiter = Timer(float(self.__Settings["openapi-period"] * 60), self.CheckUpdates)
 		self.__Repiter.start()
