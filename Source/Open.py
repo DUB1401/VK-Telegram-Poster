@@ -1,6 +1,8 @@
 from telebot.types import InputMediaDocument, InputMediaPhoto, InputMediaVideo
+from vk_api.exceptions import AuthError, ApiError
 from dublib.Methods import ReadJSON, WriteJSON
 from Source.Configurator import Configurator
+from Source.BotsManager import BotsManager
 from MessageEditor import MessageEditor
 from vk_captcha import VkCaptchaSolver
 from threading import Thread, Timer
@@ -37,7 +39,7 @@ class Open:
 				if self.__Settings["vk-access-token"] == None:
 					self.__Session.auth(token_only = True)
 				
-			except VkApi.exceptions.AuthError as ExceptionData:	
+			except AuthError as ExceptionData:	
 				# Запись в лог ошибки: исключение авторизации.
 				logging.error("[Open API] Authorization exception: " + str(ExceptionData).split(" Please")[0])
 				# Выжидание интервала.
@@ -61,7 +63,7 @@ class Open:
 			# Попытка получить список постов.
 			WallPosts = self.__API.wall.get(owner_id = WallID, count = PostsCount, offset = Offset)["items"]
 			
-		except VkApi.exceptions.ApiError as ExceptionData:
+		except ApiError as ExceptionData:
 			# Запись в лог ошибки: исключение API.
 			logging.error("[Open API] Exception: " + str(ExceptionData))
 		
@@ -81,7 +83,7 @@ class Open:
 		# Пока не будет найдено обновление.
 		while IsUpdated == False:
 			# Получение последних 20 постов.
-			Bufer = self.__GetPosts(Config["wall-id"], Offset = 20 * RequestIndex)
+			Bufer = self.__GetPosts(Config["wall-id"], Offset = (20 * RequestIndex) + 1)
 
 			# Если ID последнего отправленного поста записан.
 			if Config["last-post-id"] != None:
@@ -117,12 +119,14 @@ class Open:
 	def __SenderThread(self):
 		# Запись в лог отладочной информации: поток очереди отправки запущен.
 		logging.debug("Open API sender thread started.")
-
+		
 		# Пока сообщение не отправлено.
 		while True:
 
 			# Если в очереди на отправку есть сообщения.
 			if len(self.__MessagesBufer) > 0:
+				# Конфигурация источника.
+				Config = self.__Configurations.getConfig(self.__MessagesBufer[0]["source"])
 				# Список медиа-вложений.
 				MediaGroup = list()
 
@@ -139,7 +143,7 @@ class Open:
 								InputMediaDocument(
 									open("Temp/" + self.__MessagesBufer[0]["attachments"][Index]["filename"], "rb"), 
 									caption = self.__MessagesBufer[0]["text"] if Index == 0 else "",
-									parse_mode = self.__Configurations.getConfig(self.__MessagesBufer[0]["source"])["parse-mode"] if Index == 0 else None
+									parse_mode = Config["parse-mode"] if Index == 0 else None
 								)
 							)
 
@@ -150,7 +154,7 @@ class Open:
 								InputMediaPhoto(
 									open("Temp/" + self.__MessagesBufer[0]["attachments"][Index]["filename"], "rb"), 
 									caption = self.__MessagesBufer[0]["text"] if Index == 0 else "",
-									parse_mode = self.__Configurations.getConfig(self.__MessagesBufer[0]["source"])["parse-mode"] if Index == 0 else None
+									parse_mode = Config["parse-mode"] if Index == 0 else None
 								)
 							)
 
@@ -161,7 +165,7 @@ class Open:
 								InputMediaVideo(
 									open("Temp/" + self.__MessagesBufer[0]["attachments"][Index]["filename"], "rb"), 
 									caption = self.__MessagesBufer[0]["text"] if Index == 0 else "",
-									parse_mode = self.__Configurations.getConfig(self.__MessagesBufer[0]["source"])["parse-mode"] if Index == 0 else None
+									parse_mode = Config["parse-mode"] if Index == 0 else None
 								)
 							)
 
@@ -170,18 +174,18 @@ class Open:
 					# Если есть вложения.
 					if len(MediaGroup) > 0:
 						# Отправка медиа группы.
-						self.__TelegramBots[self.__MessagesBufer[0]["source"]].send_media_group(
+						self.__Bots.getBot(self.__MessagesBufer[0]["token"]).send_media_group(
 							self.__MessagesBufer[0]["target"], 
 							media = MediaGroup
 						)
 
 					else:
 						# Отправка текстового сообщения.
-						self.__TelegramBots[self.__MessagesBufer[0]["source"]].send_message(
+						self.__Bots.getBot(self.__MessagesBufer[0]["token"]).send_message(
 							self.__MessagesBufer[0]["target"], 
 							self.__MessagesBufer[0]["text"], 
-							parse_mode = self.__Configurations.getConfig(self.__MessagesBufer[0]["source"])["parse-mode"], 
-							disable_web_page_preview = self.__Configurations.getConfig(self.__MessagesBufer[0]["source"])["disable-web-page-preview"]
+							parse_mode = Config["parse-mode"], 
+							disable_web_page_preview = Config["disable-web-page-preview"]
 						)
 					
 				except telebot.apihelper.ApiTelegramException as ExceptionData:
@@ -194,7 +198,7 @@ class Open:
 
 					else:
 						# Запись в лог ошибки: исключение Telegram.
-						logging.error("Telegram exception: \"" + Description + "\".")
+						logging.error("Telegram exception: \"" + Description + "\"." + self.__MessagesBufer[0]["text"])
 						# Удаление первого сообщения в очереди отправки.
 						self.__MessagesBufer.pop(0)
 						
@@ -210,7 +214,7 @@ class Open:
 
 			else:
 				# Запись в лог отладочной информации: поток очереди отправки оставновлен.
-				logging.debug("Sender thread stopped.")
+				logging.debug("Open API sender thread stopped.")
 				# Остановка потока.
 				break
 
@@ -218,23 +222,26 @@ class Open:
 	def __SendMessage(self, PostObject: dict, Source: str):
 		# Состояние: есть ли запрещённые слова в посте.
 		HasBlacklistWords = False
+		# Конфигурация источника.
+		Config = self.__Configurations.getConfig(Source)
 		# Объект сообщения.
 		MessageStruct = {
 			"source": Source,
-			"target": self.__Configurations.getConfig(Source)["target"],
+			"token": Config["token"],
+			"target": Config["target"],
 			"text": None,
 			"attachments": list()
 		}
 
 		# Экранировать символы при указанной разметке MarkdownV2.
-		if self.__Configurations.getConfig(Source)["parse-mode"] == "MarkdownV2":
+		if Config["parse-mode"] == "MarkdownV2":
 			PostObject["text"] = EscapeCharacters(PostObject["text"])
 
 		# Обработка текста поста пользовательским скриптом.
 		PostObject["text"] = MessageEditor(PostObject["text"] if PostObject["text"] != None else "", Source)
 		
 		# Для каждого запрещённого слова проверить соответствие словам поста.
-		for ForbiddenWord in self.__Configurations.getConfig(Source)["blacklist"]:
+		for ForbiddenWord in Config["blacklist"]:
 			for Word in PostObject["text"].split():
 
 				# Если пост содержит запрещённое слово, то игнорировать его.
@@ -245,7 +252,7 @@ class Open:
 		if PostObject["text"] != None and PostObject["text"] != "" and HasBlacklistWords == False:
 			
 			# Если включена очистка тегов, то удалить упоминания из них.
-			if self.__Configurations.getConfig(Source)["clean-tags"] == True:
+			if Config["clean-tags"] == True:
 				PostObject["text"] = CleanTags(PostObject["text"])
 
 			# Обрезка текста поста до максимально дозволенной длинны.
@@ -287,8 +294,8 @@ class Open:
 		# Запись обновлённой конфигурации.
 		WriteJSON(f"Config/{Source}.json", Config)
 
-	# Конструктор: задаёт глобальные настройки и обработчик конфигураций.
-	def __init__(self, Settings: dict, ConfiguratorObject: Configurator):
+	# Конструктор: задаёт глобальные настройки, обработчик конфигураций и менеджер подключений к ботам.
+	def __init__(self, Settings: dict, ConfiguratorObject: Configurator, BotsManagerObject: BotsManager):
 	
 		#---> Генерация динамических свойств.
 		#==========================================================================================#
@@ -300,25 +307,28 @@ class Open:
 		self.__PostsEditorsThreads = list()
 		# Глобальные настройки.
 		self.__Settings = Settings.copy()
+		# Менеджер подключений к ботам.
+		self.__Bots = BotsManagerObject
 		# Очередь отложенных сообщений.
 		self.__MessagesBufer = list()
-		# Список экземпляров бота.
-		self.__TelegramBots = dict()
 		# Сессия ВКонтакте.
 		self.__Session = None  
 		# Обработчик повторов.
 		self.__Repiter = None
 		# Экземпляр API.
 		self.__API = None
-		
+
 		# Авторизация и получение API.
 		self.__Authorizate()
 		# Запуск потока обработки буфера сообщений.
 		self.__Sender.start()
 		
-		# Инициализация экзепляров бота.
-		for Target in self.__Configurations.getConfigsNames("Open"):
-			self.__TelegramBots[Target] = telebot.TeleBot(self.__Configurations.getToken(Target))
+		# Инициализация экзепляров ботов.
+		for ConfigName in self.__Configurations.getConfigsNames("Open"):
+			# Конфигурация источника.
+			Config = self.__Configurations.getConfig(ConfigName)
+			# Инициализация подключения к боту.
+			self.__Bots.createBotConnection(Config["token"], ConfigName, Config["target"])
 			
 		# Немедленная проверка новых постов и активация таймера.
 		self.CheckUpdates()
@@ -326,7 +336,7 @@ class Open:
 	# Интервально проверяет обновления и добавляет сообщения в очередь отправки.
 	def CheckUpdates(self):
 		# Обновление конфигураций с Open API.
-		self.__Configurations.updateOpenConfigs()
+		self.__Configurations.updateConfigs("Open")
 		# Получение списка конфигураций, использующих Open API.
 		Configs = self.__Configurations.getConfigsNames("Open")
 		# Количество новых постов.

@@ -3,6 +3,7 @@
 from dublib.Methods import CheckPythonMinimalVersion, MakeRootDirectories, ReadJSON
 from starlette.responses import HTMLResponse, Response
 from Source.Configurator import Configurator
+from Source.BotsManager import BotsManager
 from starlette.requests import Request
 from Source.Callback import Callback
 from fastapi import FastAPI
@@ -99,6 +100,8 @@ if Settings["logging"] == False:
 
 # Инициализация менеджера конфигураций.
 ConfiguratorObject = Configurator()
+# Менеджер подключений к ботам.
+BotsManagerObject = BotsManager()
 # Количество модулей с требуемыми типами API.
 RequiredAPI = ConfiguratorObject.getRequiredAPI()
 # Запись в лог сообщения: заголовок раздела обработки запросов.
@@ -107,7 +110,7 @@ logging.info("====== Working ======")
 # Если требуется обработка Callback API.
 if RequiredAPI["Callback"] > 0:
 	# Обработчик Callback-запросов.
-	CallbackSender = Callback(Settings, ConfiguratorObject)
+	CallbackSender = Callback(Settings, ConfiguratorObject, BotsManagerObject)
 
 	# Обрабатывает запросы от браузера.
 	@App.get("/vtp/{Source}")
@@ -188,4 +191,4 @@ if RequiredAPI["Callback"] > 0:
 # Если требуется обработка Open API.
 if RequiredAPI["Open"] > 0:
 	# Обработчик Open-запросов.
-	OpenSender = Open(Settings, ConfiguratorObject)
+	OpenSender = Open(Settings, ConfiguratorObject, BotsManagerObject)
