@@ -3,9 +3,9 @@ from dublib.Methods import ReadJSON, WriteJSON
 from Source.Configurator import Configurator
 from MessageEditor import MessageEditor
 from vk_captcha import VkCaptchaSolver
-from vk_api import VkApi, exceptions
 from threading import Thread, Timer
 from Source.Functions import *
+from vk_api import VkApi
 from time import sleep
 
 import telebot
@@ -37,7 +37,7 @@ class Open:
 				if self.__Settings["vk-access-token"] == None:
 					self.__Session.auth(token_only = True)
 				
-			except exceptions.AuthError as ExceptionData:	
+			except VkApi.exceptions.AuthError as ExceptionData:	
 				# Запись в лог ошибки: исключение авторизации.
 				logging.error("[Open API] Authorization exception: " + str(ExceptionData).split(" Please")[0])
 				# Выжидание интервала.
@@ -55,7 +55,15 @@ class Open:
 		# Добавление минуса к ID стены.
 		WallID = "-" + str(WallID).strip("-")
 		# Список полученных постов.
-		WallPosts = self.__API.wall.get(owner_id = WallID, count = PostsCount, offset = Offset)["items"]
+		WallPosts = list()
+		
+		try:
+			# Попытка получить список постов.
+			WallPosts = self.__API.wall.get(owner_id = WallID, count = PostsCount, offset = Offset)["items"]
+			
+		except VkApi.exceptions.ApiError as ExceptionData:
+			# Запись в лог ошибки: исключение API.
+			logging.error("[Open API] Exception: " + str(ExceptionData))
 		
 		return WallPosts
 	
