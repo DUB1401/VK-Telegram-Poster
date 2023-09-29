@@ -1,3 +1,5 @@
+from Source.Datasets import API_Types
+
 import requests
 import logging
 import os
@@ -29,7 +31,7 @@ def EscapeCharacters(Post: str) -> str:
 	return Post
 
 # Получает URL вложения и загружает его.
-def GetAttachments(PostAttachements: dict, Source: str, SupportedTypes: list[str], PostID: int) -> list:
+def GetAttachments(PostAttachements: dict, Source: str, SupportedTypes: list[str], PostID: int, API_Type: API_Types) -> list:
 	# Список вложений.
 	Attachements = list()
 
@@ -99,6 +101,6 @@ def GetAttachments(PostAttachements: dict, Source: str, SupportedTypes: list[str
 					Attachements.append(Bufer)
 					
 	# Запись в лог сообщения: количество.
-	logging.info(f"Source: \"{Source}\". Post with ID {PostID} contains " + str(len(Attachements)) + " supported attachments.")						
+	logging.info(f"[{API_Type.value} API] Source: \"{Source}\". Post with ID {PostID} contains " + str(len(Attachements)) + " supported attachments.")						
 
 	return Attachements

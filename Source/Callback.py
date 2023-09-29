@@ -2,6 +2,7 @@ from telebot.types import InputMediaDocument, InputMediaPhoto, InputMediaVideo
 from Source.Configurator import Configurator
 from Source.BotsManager import BotsManager
 from MessageEditor import MessageEditor
+from Source.Datasets import API_Types
 from Source.Functions import *
 from threading import Thread
 from time import sleep
@@ -15,7 +16,7 @@ class Callback:
 	# Обрабатывает очередь сообщений.
 	def __SenderThread(self):
 		# Запись в лог отладочной информации: поток очереди отправки запущен.
-		logging.debug("Callback API sender thread started.")
+		logging.debug("[Callback API] Sender thread started.")
 		
 		# Пока сообщение не отправлено.
 		while True:
@@ -89,19 +90,22 @@ class Callback:
 					# Описание исключения.
 					Description = str(ExceptionData)
 
-					# Если исключение вызвано частыми запросами, то выждать указанный интервал.
+					# Если исключение вызвано частыми запросами.
 					if "Too Many Requests" in Description:
+						# Запись в лог предупреждения: слишком много запросов.
+						logging.warning("[Callback API]  Too many requests to Telegram. Waiting...")
+						# Выждать указанный исключением интервал.
 						sleep(int(Description.split()[-1]) + 1)
 
 					else:
 						# Запись в лог ошибки: исключение Telegram.
-						logging.error("Telegram exception: \"" + Description + "\".")
+						logging.error("[Callback API] Telegram exception: \"" + Description + "\".")
 						# Удаление первого сообщения в очереди отправки.
 						self.__MessagesBufer.pop(0)
 						
 				except Exception as ExceptionData:
 					# Запись в лог ошибки: исключение.
-					logging.error("Exception: \"" + str(ExceptionData) + "\".")
+					logging.error("[Callback API] Exception: \"" + str(ExceptionData) + "\".")
 					# Удаление первого сообщения в очереди отправки.
 					self.__MessagesBufer.pop(0)
 
@@ -111,12 +115,12 @@ class Callback:
 
 			else:
 				# Запись в лог отладочной информации: поток очереди отправки оставновлен.
-				logging.debug("Callback API sender thread stopped.")
+				logging.debug("[Callback API] Sender thread stopped.")
 				# Остановка потока.
 				break
 
 	# Отправляет сообщение в группу Telegram через буфер ожидания.
-	def __SendMessage(self, PostObject: dict, Source: str):
+	def __SendMessage(self, PostObject: dict, Source: str, LaunchSenderThread: bool = True):
 		# Состояние: есть ли запрещённые слова в посте.
 		HasBlacklistWords = False
 		# Конфигурация источника.
@@ -168,27 +172,34 @@ class Callback:
 						SupportedTypes.append(Type)
 						
 				# Получение вложений.
-				MessageStruct["attachments"] = GetAttachments(PostObject["attachments"], Source, SupportedTypes, PostObject["id"])
+				MessageStruct["attachments"] = GetAttachments(PostObject["attachments"], Source, SupportedTypes, PostObject["id"], API_Types.Callback)
 			
 			# Помещение поста в очередь на отправку.
 			self.__MessagesBufer.append(MessageStruct)
 
 		else:
 			# Запись в лог отладочной информации: пост был проигнорирован.
-			logging.info(f"Source: \"{Source}\". Post with ID " + str(PostObject["id"]) + " was ignored.")
+			logging.info(f"[Callback API] Source: \"{Source}\". Post with ID " + str(PostObject["id"]) + " was ignored.")
 
-		# Активировать поток отправки, если не активен.
-		if self.__Sender.is_alive() == False:
-			self.__Sender = Thread(target = self.__SenderThread, name = "VK-Telegram Poster (Callback API sender)")
-			self.__Sender.start()
+		# Если указано, активировать поток отправки сообщений.
+		if LaunchSenderThread == True:
+			self.__StartSenderThread()
 		
+	# Запускает поток отправки сообщений, если тот уже не запущен.
+	def __StartSenderThread(self):
+		 
+		# Если поток отправки не функционирует, то запустить его.
+		if self.__Sender.is_alive() == False:
+			self.__Sender = Thread(target = self.__SenderThread, name = "[Open API] Sender.")
+			self.__Sender.start()
+
 	# Конструктор: задаёт глобальные настройки, обработчик конфигураций и менеджер подключений к ботам.
 	def __init__(self, Settings: dict, ConfiguratorObject: Configurator, BotsManagerObject: BotsManager):
 
 		#---> Генерация динамических свойств.
 		#==========================================================================================#
 		# Поток отправки сообщений.
-		self.__Sender = Thread(target = self.__SenderThread)
+		self.__Sender = Thread(target = self.__SenderThread, name = "[Callback API] Sender.")
 		# Конфигурации.
 		self.__Configurations = ConfiguratorObject
 		# Экзмепляры обработчиков постов.
@@ -200,11 +211,8 @@ class Callback:
 		# Очередь отложенных сообщений.
 		self.__MessagesBufer = list()
 		
-		# Запуск потока обработки буфера сообщений.
-		self.__Sender.start()
-		
 		# Инициализация экзепляров ботов.
-		for ConfigName in self.__Configurations.getConfigsNames("Callback"):
+		for ConfigName in self.__Configurations.getConfigsNames(API_Types.Callback):
 			# Конфигурация источника.
 			Config = self.__Configurations.getConfig(ConfigName)
 			# Инициализация подключения к боту.
@@ -213,7 +221,7 @@ class Callback:
 	# Добавляет сообщение в очередь отправки.
 	def AddMessageToBufer(self, CallbackRequest: dict, Source: str):
 		# Запись в лог сообщения: получен новый пост.
-		logging.info(f"Source: \"{Source}\". New post with ID " + str(CallbackRequest["object"]["id"]) + ".")
+		logging.info(f"[Callback API] Source: \"{Source}\". New post with ID " + str(CallbackRequest["object"]["id"]) + ".")
 		
 		# Проверка работы потоков.
 		for Index in range(0, len(self.__PostsEditorsThreads)):
@@ -223,6 +231,6 @@ class Callback:
 				self.__PostsEditorsThreads.pop(Index)
 
 		# Добавление потока обработчика поста в список.
-		self.__PostsEditorsThreads.append(Thread(target = self.__SendMessage, args = (CallbackRequest["object"], Source)))
+		self.__PostsEditorsThreads.append(Thread(target = self.__SendMessage, args = (CallbackRequest["object"], Source), name = "[Callback API] Post editor."))
 		# Запуск потока обработчика поста в список.
 		self.__PostsEditorsThreads[-1].start()

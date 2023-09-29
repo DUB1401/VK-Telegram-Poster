@@ -1,3 +1,4 @@
+from Source.Datasets import API_Types
 from dublib.Methods import ReadJSON
 
 import os
@@ -49,29 +50,22 @@ class Configurator:
 		return self.__Configurations[ConfigName]
 		
 	# Возвращает список конфигураций. Поддерживает фильтрацию по типу API.
-	def getConfigsNames(self, API_Type: str | None = None) -> list[str]:
+	def getConfigsNames(self, API_Type: API_Types | None = None) -> list[str]:
 		# Список конфигурация.
 		Configs = list()	
 		
 		# Если не указана спецификация API.
 		if API_Type == None:
 			Configs = self.__Configurations.keys()
-			
-		# Если запрошен список конфигураций для Callback API.
-		elif API_Type.lower() == "callback":
-			
-			# Для каждой конфигурации проверить соответствие типу API.
-			for Name in self.__Configurations.keys():
-				if self.__Configurations[Name]["api"].lower() == "callback":
-					Configs.append(Name)
+		
+		else:
+				
+			# Для каждой конфигурации.
+			for ConfigName in self.__Configurations.keys():
 					
-		# Если запрошен список конфигураций для Open API.
-		elif API_Type.lower() == "open":
-			
-			# Для каждой конфигурации проверить соответствие типу API.
-			for Name in self.__Configurations.keys():
-				if self.__Configurations[Name]["api"].lower() == "open":
-					Configs.append(Name)
+				# Если конфигурация соответствует искомому API, то записать её название.
+				if self.__Configurations[ConfigName]["api"].lower() == API_Type.value.lower():
+					Configs.append(ConfigName)
 
 		return Configs
 	
@@ -79,20 +73,20 @@ class Configurator:
 	def getRequiredAPI(self) -> dict:
 		# Список API.
 		API = {
-			"Callback": 0,
-			"Open": 0
+			API_Types.Callback: 0,
+			API_Types.LongPoll: 0,
+			API_Types.Open: 0
 		}
-		
-		# Для каждой конфигурации.
-		for ConfigName in self.__Configurations.keys():
+
+		# Для каждого типа API.
+		for API_Type in list(API_Types):
 			
-			# Если конфигурация требует Callback API.
-			if self.__Configurations[ConfigName]["api"].lower() == "callback":
-				API["Callback"] += 1
-				
-			# Если конфигурация требует Open API.
-			if self.__Configurations[ConfigName]["api"].lower() == "open":
-				API["Open"] += 1
+			# Для каждой конфигурации.
+			for ConfigName in self.__Configurations.keys():
+			
+				# Если конфигурация соответствует API.
+				if self.__Configurations[ConfigName]["api"].lower() == API_Type.value.lower():
+					API[API_Type] += 1
 				
 		return API
 
@@ -112,18 +106,18 @@ class Configurator:
 		return TokensList
 	
 	# Обновляет конфигурации с указанным типом API.
-	def updateConfigs(self, API_Type: str):
-		# Список конфигураций с Open API.
-		OpenConfigs = list()
+	def updateConfigs(self, API_Type: API_Types):
+		# Список конфигураций с указанный API.
+		SelectedConfigs = list()
 
 		# Для каждой конфигурации.
 		for ConfigName in self.__Configurations.keys():
 				
-			# Если конфигурация требует Open API.
-			if self.__Configurations[ConfigName]["api"].lower() == API_Type:
-				OpenConfigs.append(ConfigName)
+			# Если конфигурация требует указанный API.
+			if self.__Configurations[ConfigName]["api"].lower() == API_Type.value.lower():
+				SelectedConfigs.append(ConfigName)
 		
-		# Для каждого файла конфигурации с Open API.
-		for Filename in OpenConfigs:
+		# Для каждого файла конфигурации с указанный API.
+		for Filename in SelectedConfigs:
 			# Прочитать конфигурацию в словарь.
 			self.__Configurations[Filename] = ReadJSON("Config/" + Filename + ".json")

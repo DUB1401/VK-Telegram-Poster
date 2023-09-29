@@ -5,15 +5,15 @@ from starlette.responses import HTMLResponse, Response
 from Source.Configurator import Configurator
 from Source.BotsManager import BotsManager
 from starlette.requests import Request
+from Source.Datasets import API_Types
 from Source.Callback import Callback
+from Source.Open import Open
 from fastapi import FastAPI
 
 import datetime
 import logging
 import sys
 import os
-
-from Source.Open import Open
 
 #==========================================================================================#
 # >>>>> ИНИЦИАЛИЗАЦИЯ СКРИПТА <<<<< #
@@ -108,7 +108,7 @@ RequiredAPI = ConfiguratorObject.getRequiredAPI()
 logging.info("====== Working ======")
 
 # Если требуется обработка Callback API.
-if RequiredAPI["Callback"] > 0:
+if RequiredAPI[API_Types.Callback] > 0:
 	# Обработчик Callback-запросов.
 	CallbackSender = Callback(Settings, ConfiguratorObject, BotsManagerObject)
 
@@ -189,6 +189,6 @@ if RequiredAPI["Callback"] > 0:
 		return Response(content = "ok")
 	
 # Если требуется обработка Open API.
-if RequiredAPI["Open"] > 0:
+if RequiredAPI[API_Types.Open] > 0:
 	# Обработчик Open-запросов.
 	OpenSender = Open(Settings, ConfiguratorObject, BotsManagerObject)

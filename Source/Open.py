@@ -5,7 +5,8 @@ from Source.Configurator import Configurator
 from Source.BotsManager import BotsManager
 from MessageEditor import MessageEditor
 from vk_captcha import VkCaptchaSolver
-from threading import Thread, Timer
+from Source.Datasets import API_Types
+from threading import Thread
 from Source.Functions import *
 from vk_api import VkApi
 from time import sleep
@@ -91,14 +92,14 @@ class Open:
 				# Для каждого полученного поста.
 				for Post in Bufer:
 				
-					# Если ID обрабатываемого поста меньше или равен ID последнего отправленного поста.
-					if Post["id"] <= Config["last-post-id"]:
-						# Переключить состояние обновления.
-						IsUpdated = True
-				
-					else:
+					# Если ID обрабатываемого поста больше ID последнего отправленного поста.
+					if Post["id"] > Config["last-post-id"]:
 						# Записать пост.
 						Posts.append(Post)
+						
+					else:
+						# Переключить состояние обновления.
+						IsUpdated = True
 						
 			else:
 				# Записать последний пост.
@@ -118,7 +119,7 @@ class Open:
 	# Обрабатывает очередь сообщений.
 	def __SenderThread(self):
 		# Запись в лог отладочной информации: поток очереди отправки запущен.
-		logging.debug("Open API sender thread started.")
+		logging.debug("[Open API] Sender thread started.")
 		
 		# Пока сообщение не отправлено.
 		while True:
@@ -192,19 +193,22 @@ class Open:
 					# Описание исключения.
 					Description = str(ExceptionData)
 
-					# Если исключение вызвано частыми запросами, то выждать указанный интервал.
+					# Если исключение вызвано частыми запросами.
 					if "Too Many Requests" in Description:
+						# Запись в лог предупреждения: слишком много запросов.
+						logging.warning("[Open API] Too many requests to Telegram. Waiting...")
+						# Выждать указанный исключением интервал.
 						sleep(int(Description.split()[-1]) + 1)
 
 					else:
 						# Запись в лог ошибки: исключение Telegram.
-						logging.error("Telegram exception: \"" + Description + "\"." + self.__MessagesBufer[0]["text"])
+						logging.error("[Open API] Telegram exception: \"" + Description + "\"." + self.__MessagesBufer[0]["text"])
 						# Удаление первого сообщения в очереди отправки.
 						self.__MessagesBufer.pop(0)
 						
 				except Exception as ExceptionData:
 					# Запись в лог ошибки: исключение.
-					logging.error("Exception: \"" + str(ExceptionData) + "\".")
+					logging.error("[Open API] Exception: \"" + str(ExceptionData) + "\".")
 					# Удаление первого сообщения в очереди отправки.
 					self.__MessagesBufer.pop(0)
 
@@ -214,12 +218,12 @@ class Open:
 
 			else:
 				# Запись в лог отладочной информации: поток очереди отправки оставновлен.
-				logging.debug("Open API sender thread stopped.")
+				logging.debug("[Open API] Sender thread stopped.")
 				# Остановка потока.
 				break
 
 	# Отправляет сообщение в группу Telegram через буфер ожидания.
-	def __SendMessage(self, PostObject: dict, Source: str):
+	def __SendMessage(self, PostObject: dict, Source: str, LaunchSenderThread: bool = True):
 		# Состояние: есть ли запрещённые слова в посте.
 		HasBlacklistWords = False
 		# Конфигурация источника.
@@ -271,20 +275,39 @@ class Open:
 						SupportedTypes.append(Type)
 						
 				# Получение вложений.
-				MessageStruct["attachments"] = GetAttachments(PostObject["attachments"], Source, SupportedTypes, PostObject["id"])
+				MessageStruct["attachments"] = GetAttachments(PostObject["attachments"], Source, SupportedTypes, PostObject["id"], API_Types.Open)
 			
 			# Помещение поста в очередь на отправку.
 			self.__MessagesBufer.append(MessageStruct)
 
 		else:
 			# Запись в лог отладочной информации: пост был проигнорирован.
-			logging.info(f"Source: \"{Source}\". Post with ID " + str(PostObject["id"]) + " was ignored.")
+			logging.info(f"[Open API] Source: \"{Source}\". Post with ID " + str(PostObject["id"]) + " was ignored.")
 
-		# Активировать поток отправки, если не активен.
+		# Если указано, активировать поток отправки сообщений.
+		if LaunchSenderThread == True:
+			self.__StartSenderThread()
+			
+	# Запускает поток отправки сообщений, если тот уже не запущен.
+	def __StartSenderThread(self):
+		 
+		# Если поток отправки не функционирует, то запустить его.
 		if self.__Sender.is_alive() == False:
-			self.__Sender = Thread(target = self.__SenderThread, name = "VK-Telegram Poster (Open API sender)")
+			self.__Sender = Thread(target = self.__SenderThread, name = "[Open API] Sender.")
 			self.__Sender.start()
 			
+	# Поток отправки запросов к ВКонтакте.
+	def __UpdaterThread(self):
+		# Немедленная проверка новых постов.
+		self.CheckUpdates()
+		
+		# Запуск цикла ожидания.
+		while True:
+			# Выжидание одной секунды.
+			sleep(self.__Settings["openapi-period"] * 60)
+			# Проверка новых постов.
+			self.CheckUpdates()
+				
 	# Записывает ID последнего отправленного поста.
 	def __WriteLastPostID(self, Source: str, ID: int):
 		# Чтение конфигурации.
@@ -299,86 +322,76 @@ class Open:
 	
 		#---> Генерация динамических свойств.
 		#==========================================================================================#
+		# Экземпляр повторителя.
+		self.__Repeater = Thread(target = self.__UpdaterThread, name = "[Open API] Requests repeater.")
 		# Поток отправки сообщений.
-		self.__Sender = Thread(target = self.__SenderThread)
+		self.__Sender = Thread(target = self.__SenderThread, name = "[Open API] Sender.")
 		# Конфигурации.
 		self.__Configurations = ConfiguratorObject
-		# Экзмепляры обработчиков постов.
-		self.__PostsEditorsThreads = list()
 		# Глобальные настройки.
 		self.__Settings = Settings.copy()
 		# Менеджер подключений к ботам.
 		self.__Bots = BotsManagerObject
 		# Очередь отложенных сообщений.
 		self.__MessagesBufer = list()
+		# Состояние: идёт ли обновление.
+		self.__IsUpdating = False
 		# Сессия ВКонтакте.
 		self.__Session = None  
-		# Обработчик повторов.
-		self.__Repiter = None
 		# Экземпляр API.
 		self.__API = None
 
 		# Авторизация и получение API.
 		self.__Authorizate()
-		# Запуск потока обработки буфера сообщений.
-		self.__Sender.start()
 		
 		# Инициализация экзепляров ботов.
-		for ConfigName in self.__Configurations.getConfigsNames("Open"):
+		for ConfigName in self.__Configurations.getConfigsNames(API_Types.Open):
 			# Конфигурация источника.
 			Config = self.__Configurations.getConfig(ConfigName)
 			# Инициализация подключения к боту.
 			self.__Bots.createBotConnection(Config["token"], ConfigName, Config["target"])
 			
-		# Немедленная проверка новых постов и активация таймера.
-		self.CheckUpdates()
-		# Активация таймера.
-		self.__Repeater  = Timer(float(self.__Settings["openapi-period"] * 60), self.CheckUpdates)
+		# Запуск повторителя проверок.
 		self.__Repeater.start()
-			
+		
 	# Интервально проверяет обновления и добавляет сообщения в очередь отправки.
 	def CheckUpdates(self):
-		# Обновление конфигураций с Open API.
-		self.__Configurations.updateConfigs("Open")
-		# Получение списка конфигураций, использующих Open API.
-		Configs = self.__Configurations.getConfigsNames("Open")
-		# Количество новых постов.
-		NewPostsCount = 0
-		# Список постов.
-		Posts = list()
-		# Список индексов мёртвых потоков.
-		DeadThreadsIndexes = list()
 		
-		# Проверка работы потоков.
-		for Index in range(0, len(self.__PostsEditorsThreads)):
-			
-			# Если поток завершил работу, то записать его индекс.
-			if self.__PostsEditorsThreads[Index].is_alive() == False:
-				DeadThreadsIndexes.append(Index)
+		# Если обновление не выполняется.
+		if self.__IsUpdating == False:
+			# Переключение статуса обновления.
+			self.__IsUpdating = True
+			# Обновление конфигураций с Open API.
+			self.__Configurations.updateConfigs(API_Types.Open)
+			# Получение списка конфигураций, использующих Open API.
+			Configs = self.__Configurations.getConfigsNames(API_Types.Open)
+			# Список постов.
+			Posts = list()
+		
+			# Для каждой конфигурации.
+			for Source in Configs:	
+				# Получение списка новых постов (инверитрование порядка для обработки в порядке возрастания даты публикации).
+				Posts = list(reversed(self.__GetUpdates(Source)))
 				
-		# Удалить потоки по индексам начиная с конца.
-		for Index in reversed(DeadThreadsIndexes):
-			self.__PostsEditorsThreads.pop(Index)
-		
-		# Для каждой конфигурации.
-		for Source in Configs:
-			# Получение списка новых постов (инверитрование порядка для обработки в порядке возрастания даты публикации).
-			Posts = list(reversed(self.__GetUpdates(Source)))
-			# Подсчёт количества новых постов.
-			NewPostsCount += len(Posts)
-			
-			# Для каждого поста.
-			for Post in Posts:
-				# Запись в лог сообщения: получен новый пост.
-				logging.info(f"Source: \"{Source}\". New post with ID " + str(Post["id"]) + ".")
-				# Добавление потока обработчика поста в список.
-				self.__PostsEditorsThreads.append(Thread(target = self.__SendMessage, args = (Post, Source)))
-				# Запуск потока обработчика поста в список.
-				self.__PostsEditorsThreads[-1].start()
+				# Запись ID последнего отправленного поста в конфигурацию.
+				if len(Posts) > 0:
+					self.__WriteLastPostID(Source, Posts[-1]["id"])		
+
+				# Запись в лог сообщения: количество обновлённых постов.
+				logging.info(f"[Open API] Source: \"{Source}\". Updates checked. New posts count: " + str(len(Posts)) + ".")
 				
-			# Запись ID последнего отправленного поста в конфигурацию.
-			if len(Posts) > 0:
-				self.__WriteLastPostID(Source, Posts[-1]["id"])
-		
-		# Запись в лог сообщения: количество обновлённых постов.
-		logging.info(f"[Open API] Updates checked. New posts count: {NewPostsCount}.")
+				# Для каждого поста.
+				for Post in Posts:
+					# Запись в лог сообщения: получен новый пост.
+					logging.info(f"[Open API] Source: \"{Source}\". New post with ID " + str(Post["id"]) + ".")
+					# Отправка сообщения в буфер ожидания.
+					self.__SendMessage(Post, Source, LaunchSenderThread = False)
+					
+			# Запуск потока отправки сообщений.
+			self.__StartSenderThread()
+			# Переключение статуса обновления.
+			self.__IsUpdating = False
+			
+		else:
+			# Запись в лог предупреждения: обновление уже выполняется.
+			logging.warning("[Open API] Update already in progress. Skipped.")
