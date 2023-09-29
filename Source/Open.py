@@ -83,7 +83,7 @@ class Open:
 		# Пока не будет найдено обновление.
 		while IsUpdated == False:
 			# Получение последних 20 постов.
-			Bufer = self.__GetPosts(Config["wall-id"], Offset = (20 * RequestIndex) + 1)
+			Bufer = self.__GetPosts(Config["wall-id"], Offset = 20 * RequestIndex)
 
 			# Если ID последнего отправленного поста записан.
 			if Config["last-post-id"] != None:
@@ -332,6 +332,9 @@ class Open:
 			
 		# Немедленная проверка новых постов и активация таймера.
 		self.CheckUpdates()
+		# Активация таймера.
+		self.__Repeater  = Timer(float(self.__Settings["openapi-period"] * 60), self.CheckUpdates)
+		self.__Repeater.start()
 			
 	# Интервально проверяет обновления и добавляет сообщения в очередь отправки.
 	def CheckUpdates(self):
@@ -343,13 +346,19 @@ class Open:
 		NewPostsCount = 0
 		# Список постов.
 		Posts = list()
+		# Список индексов мёртвых потоков.
+		DeadThreadsIndexes = list()
 		
 		# Проверка работы потоков.
 		for Index in range(0, len(self.__PostsEditorsThreads)):
-
-			# Если поток завершил работу, то удалить его из списка.
+			
+			# Если поток завершил работу, то записать его индекс.
 			if self.__PostsEditorsThreads[Index].is_alive() == False:
-				self.__PostsEditorsThreads.pop(Index)
+				DeadThreadsIndexes.append(Index)
+				
+		# Удалить потоки по индексам начиная с конца.
+		for Index in reversed(DeadThreadsIndexes):
+			self.__PostsEditorsThreads.pop(Index)
 		
 		# Для каждой конфигурации.
 		for Source in Configs:
@@ -367,13 +376,9 @@ class Open:
 				# Запуск потока обработчика поста в список.
 				self.__PostsEditorsThreads[-1].start()
 				
-		
-		# Запись ID последнего отправленного поста в конфигурацию.
-		if len(Posts) > 0:
-			self.__WriteLastPostID(Source, Posts[-1]["id"])
+			# Запись ID последнего отправленного поста в конфигурацию.
+			if len(Posts) > 0:
+				self.__WriteLastPostID(Source, Posts[-1]["id"])
 		
 		# Запись в лог сообщения: количество обновлённых постов.
 		logging.info(f"[Open API] Updates checked. New posts count: {NewPostsCount}.")
-		# Активация таймера.
-		self.__Repiter = Timer(float(self.__Settings["openapi-period"] * 60), self.CheckUpdates)
-		self.__Repiter.start()
