@@ -178,13 +178,11 @@ if RequiredAPI[API_Types.Callback] > 0:
 			
 				else:
 					# Запись в лог ошибки: неизвестный источник.
-					logging.error(f"Unknown source: \"{Source}\".")
+					logging.error(f"[Callback API] Unknown source: \"{Source}\".")
 
 		else:
 			# Запись в лог ошибки: неподдерживаемый POST-запрос.
-			logging.error("Unsupported POST-request.")
-			# Выброс исключения.
-			raise Exception("Unsupported POST-request.")
+			logging.error("[Callback API] Unsupported POST-request.")
 
 		return Response(content = "ok")
 	

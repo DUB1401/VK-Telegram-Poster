@@ -24,7 +24,21 @@ pip install -r requirements.txt
 ```
 4. Создать в папке _Config_ файл конфигурации по предоставленному примеру (см. [здесь](#конфигурация-источника)).
 5. Настроить автопостер путём редактирования _Settings.json_. Для добавления пользовательского скрипта обработки постов можно внести изменения в файл _MessageEditor.py_.
-6. При необходимости, например в случае использования скрипта на хостинге активного сайта, настроить переадресацию [nginx](https://nginx.org/) на свободный порт.
+6. При необходимости, например в случае использования скрипта на хостинге активного сайта, настроить переадресацию [nginx](https://nginx.org/) на свободный порт. Ниже представлен пример.
+```nginx
+location /vtp/ {
+		proxy_set_header Host $server_name;
+		proxy_set_header X-Real-IP $remote_addr;
+		proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+		proxy_set_header X-Forwarded-Proto $scheme;
+		proxy_pass http://{IP}:{PORT}; # Paste here IP and port of your server.
+		proxy_read_timeout 30;
+		proxy_connect_timeout 30;
+		proxy_request_buffering off;
+		proxy_buffering off;
+		proxy_redirect off;
+    }
+```
 7. Провести валидацию сервера согласно данному [руководству](https://dev.vk.com/api/callback/getting-started#%D0%9F%D0%BE%D0%B4%D0%BA%D0%BB%D1%8E%D1%87%D0%B5%D0%BD%D0%B8%D0%B5%20Callback%20API). Код подтверждения перед верификацией занести в файл настроек _Settings.json_.
 8. Открыть директорию со скриптом в терминале. Можно использовать метод `cd` и прописать путь к папке, либо запустить терминал из проводника. Активировать автопостер командой `uvicorn vtp:App --host {IP} --port {PORT}`.
 9. Для автоматического запуска службы рекомендуется провести инициализацию скрипта через [systemd](https://github.com/systemd/systemd) (пример [здесь](https://github.com/DUB1401/VK-Telegram-Poster/tree/main/systemd)) на Linux или путём добавления его в автозагрузку на Windows.
