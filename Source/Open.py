@@ -6,8 +6,8 @@ from Source.BotsManager import BotsManager
 from MessageEditor import MessageEditor
 from vk_captcha import VkCaptchaSolver
 from Source.Datasets import API_Types
-from threading import Thread
 from Source.Functions import *
+from threading import Thread
 from vk_api import VkApi
 from time import sleep
 
@@ -296,17 +296,44 @@ class Open:
 			self.__Sender = Thread(target = self.__SenderThread, name = "[Open API] Sender.")
 			self.__Sender.start()
 			
+	# Поток-надзиратель.
+	def __SupervisorThread(self):
+		# Запись в лог отладочной информации: запущен поток-надзиратель.
+		logging.debug("[Open API] Repeater supervisor thread started.")
+		
+		# Запуск цикла проверки.
+		while True:
+			# Выжидание минуты.
+			sleep(60)
+			
+			# Если поток получения обновлений внезапно остановился.
+			if self.__Repeater.is_alive() == False:
+				# Экземпляр повторителя.
+				self.__Repeater = Thread(target = self.__UpdaterThread, name = "[Open API] Requests repeater.")
+				# Запуск повторителя проверок.
+				self.__Repeater.start()
+				# Запись в лог предупреждения: поток проверки сообщений перещапущен.
+				logging.warning("[Open API] Requests repeater thread restarted.")
+			
 	# Поток отправки запросов к ВКонтакте.
 	def __UpdaterThread(self):
-		# Немедленная проверка новых постов.
-		self.CheckUpdates()
 		
-		# Запуск цикла ожидания.
-		while True:
-			# Выжидание одной секунды.
-			sleep(self.__Settings["openapi-period"] * 60)
-			# Проверка новых постов.
+		try:
+			# Немедленная проверка новых постов.
 			self.CheckUpdates()
+		
+			# Запуск цикла ожидания.
+			while True:
+				# Выжидание одной секунды.
+				sleep(self.__Settings["openapi-period"] * 60)
+				# Проверка новых постов.
+				self.CheckUpdates()
+				
+		except Exception as ExceptionData:
+			# Переформатирование сообщения исключения.
+			ExceptionData = str(ExceptionData).split('\n')[0].rstrip(".:")
+			# Запись в лог ошибки: исключение во время проверки обновлений.
+			logging.error("[Open API] Exception while checking updates: \"" + ExceptionData + "\".")
 				
 	# Записывает ID последнего отправленного поста.
 	def __WriteLastPostID(self, Source: str, ID: int):
@@ -322,7 +349,9 @@ class Open:
 	
 		#---> Генерация динамических свойств.
 		#==========================================================================================#
-		# Экземпляр повторителя.
+		# Поток-надзиратель.
+		self.__Supervisor = Thread(target = self.__SupervisorThread, name = "[Open API] Repeater thread supervisor.")
+		# Поток проверки обновлений.
 		self.__Repeater = Thread(target = self.__UpdaterThread, name = "[Open API] Requests repeater.")
 		# Поток отправки сообщений.
 		self.__Sender = Thread(target = self.__SenderThread, name = "[Open API] Sender.")
@@ -354,6 +383,10 @@ class Open:
 		# Запуск повторителя проверок.
 		self.__Repeater.start()
 		
+		# Если указано настройками, запустить поток-надзиратель.
+		if Settings["use-supervisor"] == True:
+			self.__Supervisor.start()
+			
 	# Интервально проверяет обновления и добавляет сообщения в очередь отправки.
 	def CheckUpdates(self):
 		

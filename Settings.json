@@ -4,6 +4,7 @@
 	"app-id": 6121396,
 	"vk-access-token": "",
 	"openapi-period": 60,
+	"use-supervisor": true,
 	"confirmation-code": "",
 	"logging": true,
 	"debug": false
