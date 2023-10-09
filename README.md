@@ -3,7 +3,7 @@
 
 Для отправки сообщений используется буфер ожидания, что позволяет автопостеру корректно работать с включённым медленным режимом группы (чтобы игнорировать медленный режим или отправлять сообщения в канал, бот должен иметь права администратора). Также в скрипт внедрена возможность автоматического решения каптчи с использованием AI-сервисов.
 
-Автопостер поддерживает пересылку следующих типов вложений: _doc_, _photo_, _video_. Подробнее [здесь](https://dev.vk.com/reference/objects/attachments-wall).
+Автопостер поддерживает пересылку следующих [типов](https://dev.vk.com/reference/objects/attachments-wall) вложений: _doc_, _photo_, _video_. Для вложений типа _photo_ максимальное разрешение на данный момент составляет 2560x2048px.
 
 ## Порядок установки и использования | Callback API
 1. Загрузить последний релиз. Распаковать.
@@ -27,17 +27,17 @@ pip install -r requirements.txt
 6. При необходимости, например в случае использования скрипта на хостинге активного сайта, настроить переадресацию [nginx](https://nginx.org/) на свободный порт. Ниже представлен пример.
 ```nginx
 location /vtp/ {
-		proxy_set_header Host $server_name;
-		proxy_set_header X-Real-IP $remote_addr;
-		proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-		proxy_set_header X-Forwarded-Proto $scheme;
-		proxy_pass http://{IP}:{PORT}; # Paste here IP and port of your server.
-		proxy_read_timeout 30;
-		proxy_connect_timeout 30;
-		proxy_request_buffering off;
-		proxy_buffering off;
-		proxy_redirect off;
-    }
+	proxy_set_header Host $server_name;
+	proxy_set_header X-Real-IP $remote_addr;
+	proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+	proxy_set_header X-Forwarded-Proto $scheme;
+	proxy_pass http://{IP}:{PORT}; # Поместите сюда IP и порт вашего сервера.
+	proxy_read_timeout 30;
+	proxy_connect_timeout 30;
+	proxy_request_buffering off;
+	proxy_buffering off;
+	proxy_redirect off;
+}
 ```
 7. Провести валидацию сервера согласно данному [руководству](https://dev.vk.com/api/callback/getting-started#%D0%9F%D0%BE%D0%B4%D0%BA%D0%BB%D1%8E%D1%87%D0%B5%D0%BD%D0%B8%D0%B5%20Callback%20API). Код подтверждения перед верификацией занести в файл настроек _Settings.json_.
 8. Открыть директорию со скриптом в терминале. Можно использовать метод `cd` и прописать путь к папке, либо запустить терминал из проводника. Активировать автопостер командой `uvicorn vtp:App --host {IP} --port {PORT}`.
