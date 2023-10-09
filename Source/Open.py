@@ -308,6 +308,8 @@ class Open:
 			
 			# Если поток получения обновлений внезапно остановился.
 			if self.__Repeater.is_alive() == False:
+				# Переключение состояния обновления.
+				self.__IsUpdating = False
 				# Экземпляр повторителя.
 				self.__Repeater = Thread(target = self.__UpdaterThread, name = "[Open API] Requests repeater.")
 				# Запуск повторителя проверок.
@@ -316,11 +318,13 @@ class Open:
 				logging.warning("[Open API] Requests repeater thread restarted.")
 			
 	# Поток отправки запросов к ВКонтакте.
-	def __UpdaterThread(self):
+	def __UpdaterThread(self, ImmediatelyUpdate: bool = False):
 		
 		try:
+			
 			# Немедленная проверка новых постов.
-			self.CheckUpdates()
+			if ImmediatelyUpdate == True:
+				self.CheckUpdates()
 		
 			# Запуск цикла ожидания.
 			while True:
@@ -352,7 +356,7 @@ class Open:
 		# Поток-надзиратель.
 		self.__Supervisor = Thread(target = self.__SupervisorThread, name = "[Open API] Repeater thread supervisor.")
 		# Поток проверки обновлений.
-		self.__Repeater = Thread(target = self.__UpdaterThread, name = "[Open API] Requests repeater.")
+		self.__Repeater = Thread(target = self.__UpdaterThread, args = [True], name = "[Open API] Requests repeater.")
 		# Поток отправки сообщений.
 		self.__Sender = Thread(target = self.__SenderThread, name = "[Open API] Sender.")
 		# Конфигурации.
