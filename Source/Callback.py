@@ -121,8 +121,8 @@ class Callback:
 
 	# Отправляет сообщение в группу Telegram через буфер ожидания.
 	def __SendMessage(self, PostObject: dict, Source: str, LaunchSenderThread: bool = True):
-		# Состояние: есть ли запрещённые слова в посте.
-		HasBlacklistWords = False
+		# Состояние: есть ли запрещённые конструкции в посте.
+		HasBlacklistRegex = False
 		# Конфигурация источника.
 		Config = self.__Configurations.getConfig(Source)
 		# Объект сообщения.
@@ -141,16 +141,15 @@ class Callback:
 		# Обработка текста поста пользовательским скриптом.
 		PostObject["text"] = MessageEditor(PostObject["text"] if PostObject["text"] != None else "", Source)
 		
-		# Для каждого запрещённого слова проверить соответствие словам поста.
-		for ForbiddenWord in Config["blacklist"]:
-			for Word in PostObject["text"].split():
-
-				# Если пост содержит запрещённое слово, то игнорировать его.
-				if ForbiddenWord.lower() == Word.lower():
-					HasBlacklistWords = True
+		# Для каждого регулярного выражения запрещённой конструкции.
+		for ForbiddenRegex in Config["blacklist"]:
+			
+			# Если в тексте сообщения найдено совпадение с запрещённой конструкцией, игнорировать его.
+			if re.search(ForbiddenRegex, PostObject["text"], re.IGNORECASE) != None:
+				HasBlacklistRegex = True
 
 		# Если сообщение не игнорируется.
-		if PostObject["text"] != None and PostObject["text"] != "" and HasBlacklistWords == False:
+		if PostObject["text"] != None and PostObject["text"] != "" and HasBlacklistRegex == False:
 			
 			# Если включена очистка тегов, то удалить упоминания из них.
 			if Config["clean-tags"] == True:

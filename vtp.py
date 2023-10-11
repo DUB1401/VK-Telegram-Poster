@@ -43,30 +43,13 @@ logging.getLogger("vk_api").setLevel(logging.CRITICAL)
 #==========================================================================================#
 
 # Версия скрипта.
-Version = "1.2.0"
+Version = "1.3.0"
 # Текст копирайта.
 Copyright = "Copyright © DUB1401. 2022-2023."
 # Обработчик запросов FastAPI.
 App = FastAPI()
 # Глобальные настройки.
-Settings = {
-	"token": "",
-	"target-id": "",
-	"source": "vk-group-wall",
-	"clean-tags": True,
-	"parse-mode": None,
-	"disable-web-page-preview": True,
-	"blacklist": list(),
-	"attachments": {
-		"audio": True,
-		"doc": True,
-		"photo": True,
-		"video": True
-	},
-	"confirmation-code": "",
-	"logging": False,
-	"debug": False
-}
+Settings = None
 # Запись в лог сообщения: версия скрипта.
 logging.info("====== VK-Telegram Poster v" + Version + " ======")
 # Запись в лог сообщения: используемая версия Python и платформа.

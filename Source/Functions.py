@@ -56,15 +56,21 @@ def GetAttachments(PostAttachements: dict, Source: str, SupportedTypes: list[str
 				# Получение URL вложения и названия файла (photo).
 				if Bufer["type"] == "photo":
 					
-					# Для каждого размера изображения.
+					# Для каждого разрешения изображения.
 					for Size in Attachment[Type]["sizes"]:
 						
-						# Если обнаружен максимальный размер фотографии.
+						# Если обнаружено максимальное разрешение фотографии.
 						if Size["type"] == "w":
 							# Записать URL фотографии.
 							Bufer["url"] = Size["url"]
-							# Запись названия файла изображения.
-							Bufer["filename"] = Bufer["url"].split('?')[0].split('/')[-1]
+							
+					# Если не найдено максимальное разрешение.
+					if Bufer["url"] == None:
+						# Записать URL последнего в списке размера.
+						Bufer["url"] = Attachment[Type]["sizes"][-1]["url"]
+						
+					# Запись названия файла изображения.
+					Bufer["filename"] = Bufer["url"].split('?')[0].split('/')[-1]
 
 				# Получение URL вложения и названия файла (video).
 				if Bufer["type"] == "video":
