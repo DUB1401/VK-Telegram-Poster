@@ -145,7 +145,7 @@ class Callback:
 		for ForbiddenRegex in Config["blacklist"]:
 			
 			# Если в тексте сообщения найдено совпадение с запрещённой конструкцией, игнорировать его.
-			if re.search(ForbiddenRegex, PostObject["text"], re.IGNORECASE) != None:
+			if re.search(ForbiddenRegex, PostObject["text"] if PostObject["text"] != None else "", re.IGNORECASE) != None:
 				HasBlacklistRegex = True
 
 		# Если сообщение не игнорируется.
