@@ -226,6 +226,8 @@ class Open:
 	def __SendMessage(self, PostObject: dict, Source: str, LaunchSenderThread: bool = True):
 		# Состояние: есть ли запрещённые конструкции в посте.
 		HasBlacklistRegex = False
+		# Список разрешённых типов постов.
+		AllowedTypes = ["post", "reply"]
 		# Конфигурация источника.
 		Config = self.__Configurations.getConfig(Source)
 		# Объект сообщения.
@@ -252,7 +254,7 @@ class Open:
 				HasBlacklistRegex = True
 
 		# Если сообщение не игнорируется.
-		if PostObject["text"] != None and PostObject["text"] != "" and HasBlacklistRegex == False:
+		if PostObject["text"] != None and PostObject["text"] != "" and HasBlacklistRegex == False and PostObject["post_type"] in AllowedTypes:
 			
 			# Если включена очистка тегов, то удалить упоминания из них.
 			if Config["clean-tags"] == True:

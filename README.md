@@ -223,8 +223,8 @@ ___
 acl all src 0.0.0.0/0
 http_access allow all
 ```
-5. Перезапустите службу [Squid](https://github.com/squid-cache/squid).
-6. Установите в ваш браузер [это](https://chromewebstore.google.com/detail/proxycontrol-%D0%BC%D0%B5%D0%BD%D0%B5%D0%B4%D0%B6%D0%B5%D1%80-%D0%B4%D0%BB%D1%8F/hjocpjdeacglfchomobaagbmipeggnjg) расширение и в его настройки занесите IP вашего сервера и стандартный прослушиваемый порт – **3128**. Включите расширение.
+5. Перезапустите службу [Squid](https://github.com/squid-cache/squid): `systemctl restart squid`.
+6. Установите в браузер [это](https://chromewebstore.google.com/detail/proxycontrol-%D0%BC%D0%B5%D0%BD%D0%B5%D0%B4%D0%B6%D0%B5%D1%80-%D0%B4%D0%BB%D1%8F/hjocpjdeacglfchomobaagbmipeggnjg) расширение и в его настройки занесите IP вашего сервера и стандартный прослушиваемый порт – **3128**. Включите установленный прокси.
 7. Откройте в браузере любой [сервис](https://whoer.net/ru), определяющий ваш IP, и убедитесь в том, что прокси работает.
 8. Перейдите по [ссылке](https://oauth.vk.com/authorize?client_id=6121396&display=page&redirect_uri=https://oauth.vk.com/blank.html&scope=offline,wall&response_type=token&v=5.154), подтвердите предоставление прав и скопируйте токен из адресной строки браузера начиная от **token=** до **&expires_in=0**.
 
