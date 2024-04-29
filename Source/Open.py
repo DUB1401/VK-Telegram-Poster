@@ -13,6 +13,9 @@ from time import sleep
 
 import telebot
 
+# Название API.
+API_NAME = "Open"
+
 # Обработчик запросов Open API ВКонтакте.
 class Open:
 	
@@ -42,7 +45,7 @@ class Open:
 				
 			except AuthError as ExceptionData:	
 				# Запись в лог ошибки: исключение авторизации.
-				logging.error("[Open API] Authorization exception: " + str(ExceptionData).split(" Please")[0])
+				logging.error(f"[{API_NAME} API] Authorization exception: " + str(ExceptionData).split(" Please")[0])
 				# Выжидание интервала.
 				sleep(5)
 				
@@ -66,7 +69,7 @@ class Open:
 			
 		except ApiError as ExceptionData:
 			# Запись в лог ошибки: исключение API.
-			logging.error("[Open API] Exception: " + str(ExceptionData))
+			logging.error(f"[{API_NAME} API] Exception: " + str(ExceptionData))
 		
 		return WallPosts
 	
@@ -116,10 +119,31 @@ class Open:
 
 		return Posts	
 	
+	# Удаляет из очереди первое сообщение.
+	def __PopMessage(self):
+
+		# Если включен режим очистки вложений.
+		if self.__Settings["autoclean"]:
+
+			# Для каждого вложения.
+			for Index in range(0, len(self.__MessagesBufer[0]["attachments"])):		
+				# Путь к файлу.
+				FilePath = 	"Temp/" + self.__MessagesBufer[0]["attachments"][Index]["filename"]
+				
+				# Если файл существует.
+				if os.path.exists(FilePath):
+					# Удаление файла.
+					os.remove(FilePath)
+					# Запись в лог сообщения: файл удалён.
+					logging.info(f"[{API_NAME} API] File \"" + self.__MessagesBufer[0]["attachments"][Index]["filename"] + "\" removed.")
+
+		# Удаление из очереди первого сообщения.
+		self.__MessagesBufer.pop(0)
+
 	# Обрабатывает очередь сообщений.
 	def __SenderThread(self):
 		# Запись в лог отладочной информации: поток очереди отправки запущен.
-		logging.debug("[Open API] Sender thread started.")
+		logging.debug(f"[{API_NAME} API] Sender thread started.")
 		
 		# Пока сообщение не отправлено.
 		while True:
@@ -147,7 +171,7 @@ class Open:
 									parse_mode = Config["parse-mode"] if Index == 0 else None
 								)
 							)
-
+							
 						# Если тип вложения – photo.
 						if self.__MessagesBufer[0]["attachments"][Index]["type"] == "photo":
 							# Дополнить медиа группу вложением (photo).
@@ -158,7 +182,7 @@ class Open:
 									parse_mode = Config["parse-mode"] if Index == 0 else None
 								)
 							)
-
+							
 						# Если тип вложения – video.
 						if self.__MessagesBufer[0]["attachments"][Index]["type"] == "video":
 							# Дополнить медиа группу вложением (video).
@@ -169,7 +193,7 @@ class Open:
 									parse_mode = Config["parse-mode"] if Index == 0 else None
 								)
 							)
-
+							
 				try:
 					
 					# Если есть вложения.
@@ -196,29 +220,29 @@ class Open:
 					# Если исключение вызвано частыми запросами.
 					if "Too Many Requests" in Description:
 						# Запись в лог предупреждения: слишком много запросов.
-						logging.warning("[Open API] Too many requests to Telegram. Waiting...")
+						logging.warning(f"[{API_NAME} API] Too many requests to Telegram. Waiting...")
 						# Выждать указанный исключением интервал.
 						sleep(int(Description.split()[-1]) + 1)
 
 					else:
 						# Запись в лог ошибки: исключение Telegram.
-						logging.error("[Open API] Telegram exception: \"" + Description + "\"." + self.__MessagesBufer[0]["text"])
+						logging.error(f"[{API_NAME} API] Telegram exception: \"" + Description + "\"." + self.__MessagesBufer[0]["text"])
 						# Удаление первого сообщения в очереди отправки.
-						self.__MessagesBufer.pop(0)
+						self.__PopMessage()
 						
 				except Exception as ExceptionData:
 					# Запись в лог ошибки: исключение.
-					logging.error("[Open API] Exception: \"" + str(ExceptionData) + "\".")
+					logging.error(f"[{API_NAME} API] Exception: \"" + str(ExceptionData) + "\".")
 					# Удаление первого сообщения в очереди отправки.
-					self.__MessagesBufer.pop(0)
+					self.__PopMessage()
 
 				else:
 					# Удаление первого сообщения в очереди отправки.
-					self.__MessagesBufer.pop(0)
+					self.__PopMessage()
 
 			else:
 				# Запись в лог отладочной информации: поток очереди отправки оставновлен.
-				logging.debug("[Open API] Sender thread stopped.")
+				logging.debug(f"[{API_NAME} API] Sender thread stopped.")
 				# Остановка потока.
 				break
 
@@ -283,7 +307,7 @@ class Open:
 
 		else:
 			# Запись в лог отладочной информации: пост был проигнорирован.
-			logging.info(f"[Open API] Source: \"{Source}\". Post with ID " + str(PostObject["id"]) + " was ignored.")
+			logging.info(f"[{API_NAME} API] Source: \"{Source}\". Post with ID " + str(PostObject["id"]) + " was ignored.")
 
 		# Если указано, активировать поток отправки сообщений.
 		if LaunchSenderThread == True:
@@ -294,13 +318,13 @@ class Open:
 		 
 		# Если поток отправки не функционирует, то запустить его.
 		if self.__Sender.is_alive() == False:
-			self.__Sender = Thread(target = self.__SenderThread, name = "[Open API] Sender.")
+			self.__Sender = Thread(target = self.__SenderThread, name = f"[{API_NAME} API] Sender.")
 			self.__Sender.start()
 			
 	# Поток-надзиратель.
 	def __SupervisorThread(self):
 		# Запись в лог отладочной информации: запущен поток-надзиратель.
-		logging.debug("[Open API] Repeater supervisor thread started.")
+		logging.debug(f"[{API_NAME} API] Repeater supervisor thread started.")
 		
 		# Запуск цикла проверки.
 		while True:
@@ -312,11 +336,11 @@ class Open:
 				# Переключение состояния обновления.
 				self.__IsUpdating = False
 				# Экземпляр повторителя.
-				self.__Repeater = Thread(target = self.__UpdaterThread, name = "[Open API] Requests repeater.")
+				self.__Repeater = Thread(target = self.__UpdaterThread, name = f"[{API_NAME} API] Requests repeater.")
 				# Запуск повторителя проверок.
 				self.__Repeater.start()
 				# Запись в лог предупреждения: поток проверки сообщений перещапущен.
-				logging.warning("[Open API] Requests repeater thread restarted.")
+				logging.warning(f"[{API_NAME} API] Requests repeater thread restarted.")
 			
 	# Поток отправки запросов к ВКонтакте.
 	def __UpdaterThread(self, ImmediatelyUpdate: bool = False):
@@ -338,7 +362,7 @@ class Open:
 			# Переформатирование сообщения исключения.
 			ExceptionData = str(ExceptionData).split('\n')[0].rstrip(".:")
 			# Запись в лог ошибки: исключение во время проверки обновлений.
-			logging.error("[Open API] Updater exception: \"" + ExceptionData + "\".")
+			logging.error(f"[{API_NAME} API] Updater exception: \"" + ExceptionData + "\".")
 				
 	# Записывает ID последнего отправленного поста.
 	def __WriteLastPostID(self, Source: str, ID: int):
@@ -355,11 +379,11 @@ class Open:
 		#---> Генерация динамических свойств.
 		#==========================================================================================#
 		# Поток-надзиратель.
-		self.__Supervisor = Thread(target = self.__SupervisorThread, name = "[Open API] Repeater thread supervisor.")
+		self.__Supervisor = Thread(target = self.__SupervisorThread, name = f"[{API_NAME} API] Repeater thread supervisor.")
 		# Поток проверки обновлений.
-		self.__Repeater = Thread(target = self.__UpdaterThread, args = [True], name = "[Open API] Requests repeater.")
+		self.__Repeater = Thread(target = self.__UpdaterThread, args = [True], name = f"[{API_NAME} API] Requests repeater.")
 		# Поток отправки сообщений.
-		self.__Sender = Thread(target = self.__SenderThread, name = "[Open API] Sender.")
+		self.__Sender = Thread(target = self.__SenderThread, name = f"[{API_NAME} API] Sender.")
 		# Конфигурации.
 		self.__Configurations = ConfiguratorObject
 		# Глобальные настройки.
@@ -416,12 +440,12 @@ class Open:
 					self.__WriteLastPostID(Source, Posts[-1]["id"])		
 
 				# Запись в лог сообщения: количество обновлённых постов.
-				logging.info(f"[Open API] Source: \"{Source}\". Updates checked. New posts count: " + str(len(Posts)) + ".")
+				logging.info(f"[{API_NAME} API] Source: \"{Source}\". Updates checked. New posts count: " + str(len(Posts)) + ".")
 				
 				# Для каждого поста.
 				for Post in Posts:
 					# Запись в лог сообщения: получен новый пост.
-					logging.info(f"[Open API] Source: \"{Source}\". New post with ID " + str(Post["id"]) + ".")
+					logging.info(f"[{API_NAME} API] Source: \"{Source}\". New post with ID " + str(Post["id"]) + ".")
 					# Отправка сообщения в буфер ожидания.
 					self.__SendMessage(Post, Source, LaunchSenderThread = False)
 					
@@ -432,4 +456,4 @@ class Open:
 			
 		else:
 			# Запись в лог предупреждения: обновление уже выполняется.
-			logging.warning("[Open API] Update already in progress. Skipped.")
+			logging.warning(f"[{API_NAME} API] Update already in progress. Skipped.")

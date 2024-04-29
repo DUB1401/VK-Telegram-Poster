@@ -1,7 +1,7 @@
-git+https://github.com/DUB1401/dublib
 pyTelegramBotAPI
 onnxruntime
 vk_captcha
 fastapi
 uvicorn
+dublib>=0.6.0
 vk_api

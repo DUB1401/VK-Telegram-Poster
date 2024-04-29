@@ -6,6 +6,7 @@
 	"openapi-period": 60,
 	"use-supervisor": true,
 	"confirmation-code": "",
+	"autoclean": true,
 	"logging": true,
 	"debug": false
 }

@@ -13,7 +13,7 @@ Type=simple
 User=root
 Group=root
 WorkingDirectory={Application Directory}
-ExecStart=/usr/local/bin/uvicorn vtp:App --host {IP} --port {PORT}
+ExecStart=/usr/local/bin/uvicorn main:App --host {IP} --port {PORT}
 Restart=on-failure
 RestartSec=60
 

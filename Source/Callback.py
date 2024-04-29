@@ -10,13 +10,37 @@ from time import sleep
 import logging
 import telebot
 
+# Название API.
+API_NAME = "Callback"
+
 # Обработчик запросов Callback API ВКонтакте.
 class Callback:
+
+	# Удаляет из очереди первое сообщение.
+	def __PopMessage(self):
+
+		# Если включен режим очистки вложений.
+		if self.__Settings["autoclean"]:
+
+			# Для каждого вложения.
+			for Index in range(0, len(self.__MessagesBufer[0]["attachments"])):		
+				# Путь к файлу.
+				FilePath = 	"Temp/" + self.__MessagesBufer[0]["attachments"][Index]["filename"]
+				
+				# Если файл существует.
+				if os.path.exists(FilePath):
+					# Удаление файла.
+					os.remove(FilePath)
+					# Запись в лог сообщения: файл удалён.
+					logging.info(f"[{API_NAME} API] File \"" + self.__MessagesBufer[0]["attachments"][Index]["filename"] + "\" removed.")
+
+		# Удаление из очереди первого сообщения.
+		self.__MessagesBufer.pop(0)
 
 	# Обрабатывает очередь сообщений.
 	def __SenderThread(self):
 		# Запись в лог отладочной информации: поток очереди отправки запущен.
-		logging.debug("[Callback API] Sender thread started.")
+		logging.debug(f"[{API_NAME} API] Sender thread started.")
 		
 		# Пока сообщение не отправлено.
 		while True:
@@ -66,7 +90,14 @@ class Callback:
 									parse_mode = Config["parse-mode"] if Index == 0 else None
 								)
 							)
-
+							
+						# Если указано удалить файл после отправки.
+						if self.__Settings["autoclean"] == True:
+							# Удаление файла.
+							os.remove("Temp/" + self.__MessagesBufer[0]["attachments"][Index]["filename"])
+							# Запись в лог сообщения: файл удалён.
+							logging.info(f"[{API_NAME} API] File \"" + self.__MessagesBufer[0]["attachments"][Index]["filename"] + "\" removed.")
+							
 				try:
 					
 					# Если есть вложения.
@@ -93,29 +124,29 @@ class Callback:
 					# Если исключение вызвано частыми запросами.
 					if "Too Many Requests" in Description:
 						# Запись в лог предупреждения: слишком много запросов.
-						logging.warning("[Callback API]  Too many requests to Telegram. Waiting...")
+						logging.warning(f"[{API_NAME} API]  Too many requests to Telegram. Waiting...")
 						# Выждать указанный исключением интервал.
 						sleep(int(Description.split()[-1]) + 1)
 
 					else:
 						# Запись в лог ошибки: исключение Telegram.
-						logging.error("[Callback API] Telegram exception: \"" + Description + "\".")
+						logging.error(f"[{API_NAME} API] Telegram exception: \"" + Description + "\".")
 						# Удаление первого сообщения в очереди отправки.
-						self.__MessagesBufer.pop(0)
+						self.__PopMessage()
 						
 				except Exception as ExceptionData:
 					# Запись в лог ошибки: исключение.
-					logging.error("[Callback API] Exception: \"" + str(ExceptionData) + "\".")
+					logging.error(f"[{API_NAME} API] Exception: \"" + str(ExceptionData) + "\".")
 					# Удаление первого сообщения в очереди отправки.
-					self.__MessagesBufer.pop(0)
+					self.__PopMessage()
 
 				else:
 					# Удаление первого сообщения в очереди отправки.
-					self.__MessagesBufer.pop(0)
+					self.__PopMessage()
 
 			else:
 				# Запись в лог отладочной информации: поток очереди отправки оставновлен.
-				logging.debug("[Callback API] Sender thread stopped.")
+				logging.debug(f"[{API_NAME} API] Sender thread stopped.")
 				# Остановка потока.
 				break
 
@@ -180,7 +211,7 @@ class Callback:
 
 		else:
 			# Запись в лог отладочной информации: пост был проигнорирован.
-			logging.info(f"[Callback API] Source: \"{Source}\". Post with ID " + str(PostObject["id"]) + " was ignored.")
+			logging.info(f"[{API_NAME} API] Source: \"{Source}\". Post with ID " + str(PostObject["id"]) + " was ignored.")
 
 		# Если указано, активировать поток отправки сообщений.
 		if LaunchSenderThread == True:
@@ -200,7 +231,7 @@ class Callback:
 		#---> Генерация динамических свойств.
 		#==========================================================================================#
 		# Поток отправки сообщений.
-		self.__Sender = Thread(target = self.__SenderThread, name = "[Callback API] Sender.")
+		self.__Sender = Thread(target = self.__SenderThread, name = f"[{API_NAME} API] Sender.")
 		# Конфигурации.
 		self.__Configurations = ConfiguratorObject
 		# Экзмепляры обработчиков постов.
@@ -222,7 +253,7 @@ class Callback:
 	# Добавляет сообщение в очередь отправки.
 	def AddMessageToBufer(self, CallbackRequest: dict, Source: str):
 		# Запись в лог сообщения: получен новый пост.
-		logging.info(f"[Callback API] Source: \"{Source}\". New post with ID " + str(CallbackRequest["object"]["id"]) + ".")
+		logging.info(f"[{API_NAME} API] Source: \"{Source}\". New post with ID " + str(CallbackRequest["object"]["id"]) + ".")
 		
 		# Проверка работы потоков.
 		for Index in range(0, len(self.__PostsEditorsThreads)):
@@ -232,6 +263,6 @@ class Callback:
 				self.__PostsEditorsThreads.pop(Index)
 
 		# Добавление потока обработчика поста в список.
-		self.__PostsEditorsThreads.append(Thread(target = self.__SendMessage, args = (CallbackRequest["object"], Source), name = "[Callback API] Post editor."))
+		self.__PostsEditorsThreads.append(Thread(target = self.__SendMessage, args = (CallbackRequest["object"], Source), name = f"[{API_NAME} API] Post editor."))
 		# Запуск потока обработчика поста в список.
 		self.__PostsEditorsThreads[-1].start()
