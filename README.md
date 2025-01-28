@@ -244,4 +244,4 @@ ___
 * [@yt-dlp](https://github.com/yt-dlp) – библиотека загрузки потокового видео;
 * [@python273](https://github.com/python273/vk_api) – имплементация Open API [ВКонтакте](https://vk.com/).
 
-_Copyright © DUB1401. 2022-2024._
+_Copyright © DUB1401. 2022-2025._

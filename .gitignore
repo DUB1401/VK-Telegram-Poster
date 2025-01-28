@@ -1,7 +1,6 @@
-# Visual Studio project files.
-VK-Telegram Poster.pyproj
-VK-Telegram Poster.sln
-.vs
+# Python cache and virtual enviroment/
+__pycache__
+.venv
 
 # Work folders.
 Config/*
@@ -14,6 +13,3 @@ Temp
 
 # VK coockies.
 vk_config.v2.json
-
-# Python cache.
-__pycache__
