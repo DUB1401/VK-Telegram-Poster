@@ -1,9 +1,12 @@
-from .Config import Config
-from ..API import Callback, Open, Types
+from Source.API import Callback, Open, Types
+from Source.BaseEditor import BaseEditor
+from Source.Config import Config
 
-import os
+from dublib.Methods.Filesystem import ListDir
 
-class SystemManager:
+import importlib
+
+class Manager:
 	"""Системный менеджер."""
 
 	#==========================================================================================#
@@ -14,7 +17,7 @@ class SystemManager:
 	def configs(self) -> list[Config]:
 		"""Список конфигураций."""
 
-		return list(self.__Configs.values)
+		return list(self.__Configs.values())
 
 	@property
 	def configs_names(self) -> list[str]:
@@ -29,15 +32,16 @@ class SystemManager:
 	def __LoadConfigs(self):
 		"""Загружает файлы конфигураций."""
 
-		ConfigsFiles = os.listdir("Configs")
-		ConfigsFiles = list(filter(lambda File: File.endswith(".json"), ConfigsFiles))
+		ConfigsFiles = ListDir("Configs")
+		ConfigsFiles = tuple(filter(lambda File: File.endswith(".json"), ConfigsFiles))
+		ConfigsFiles = tuple(filter(lambda File: not File.startswith("#"), ConfigsFiles))
 
 		for Filename in ConfigsFiles:
 			Filename = Filename[:-5]
 			NewConfig = Config(Filename)
 			self.__API[NewConfig.type]["required"] = True
 			self.__Configs[Filename] = NewConfig
-			self.__Workers[Filename] = self.__API[NewConfig.type]["worker"](NewConfig)
+			self.__Workers[Filename] = self.__API[NewConfig.type]["worker"](NewConfig, self.get_editor(Filename))
 
 	#==========================================================================================#
 	# >>>>> ПУБЛИЧНЫЕ МЕТОДЫ <<<<< #
@@ -61,7 +65,7 @@ class SystemManager:
 			},
 			Types.Open: {
 				"required": False,
-				"worker": None
+				"worker": Open
 			}
 		}
 		self.__Workers = dict()
@@ -83,6 +87,22 @@ class SystemManager:
 		"""
 
 		return self.__Configs[name]
+	
+	def get_editor(self, name: str) -> BaseEditor | None:
+		"""
+		Возвращает редактор.
+			name – название конфигурации.
+		"""
+
+		Editor = None
+
+		try:
+			Module = importlib.import_module(f"Editors.{name}")
+			Editor = Module.Editor(self.get_config(name))
+
+		except ImportError: pass
+
+		return Editor
 	
 	def get_worker(self, name: str) -> Callback | Open:
 		"""

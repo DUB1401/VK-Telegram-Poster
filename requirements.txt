@@ -1,7 +1,6 @@
 pyTelegramBotAPI
-onnxruntime
 vk_captcha
 fastapi
 uvicorn
-dublib==0.13.0
+dublib==0.18.2
 vk_api

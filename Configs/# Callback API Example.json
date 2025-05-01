@@ -1,0 +1,13 @@
+{
+	"api": "Callback",
+	"bot_token": "",
+	"chat_id": null,
+	"clean_tags": true,
+	"disable_web_page_preview": true,
+	"blacklist": [],
+	"attachments": {
+		"doc": true,
+		"photo": true,
+		"video": true
+	}
+}

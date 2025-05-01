@@ -1,15 +1,15 @@
-# Python cache and virtual enviroment/
+# Python cache and virtual enviroment.
 __pycache__
 .venv
 
-# Work folders.
-Config/*
+# Runtime data.
+Configs/*
 Logs
 Temp
 
 # Don't ignore configs examples.
-!Config/# Callback API Example.json
-!Config/# Open API Example.json
+!Configs/# Callback API Example.json
+!Configs/# Open API Example.json
 
-# VK coockies.
+# VK cookies.
 vk_config.v2.json

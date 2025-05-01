@@ -1,8 +1,9 @@
-from ..API import Types
+from Source.API.Types import Types
 
-from dublib.Methods.JSON import ReadJSON, WriteJSON
+from dublib.Methods.Filesystem import ReadJSON, WriteJSON
 
 import logging
+
 import telebot
 
 class AttachmentsStatus:
@@ -108,12 +109,6 @@ class Config:
 		"""Период запроса обновлений."""
 
 		return self.__Data["period"]
-
-	@property
-	def parse_mode(self) -> str | None:
-		"""Режим парсинга сообщений."""
-
-		return self.__Data["parse_mode"]
 	
 	@property
 	def password(self) -> str | None:
@@ -181,10 +176,9 @@ class Config:
 			"chat_id": None,
 
 			"clean_tags": True,
-			"parse_mode": None,
 			"disable_web_page_preview": True,
+			"blacklist": [],
 
-			"blacklists": [],
 			"attachments": {
 				"doc": True,
 				"photo": True,
@@ -196,6 +190,7 @@ class Config:
 			"app_id": 6121396,
 			"vk_token": None,
 			"wall_id": None,
+			
 			"period": 60,
 			"last_post_id": None
 		}
@@ -205,7 +200,7 @@ class Config:
 		self.__Bot = telebot.TeleBot(self.__Data["bot_token"])
 		self.__Attachments = AttachmentsStatus(self.__Data["attachments"])
 
-	def check_attachments_type(self, type: str) -> bool:
+	def check_attachment_type_available(self, type: str) -> bool:
 		"""
 		Проверяет, включена ли пересылка типа вложения.
 			type – тип.
@@ -216,12 +211,14 @@ class Config:
 			case "photo": return self.attachments.photo
 			case "video": return self.attachments.video
 
-		raise Exception(f"No attacnhments type: \"{type}\".")
+		return False
 	
 	def save(self):
 		"""Сохраняет файл конфигурации."""
 
-		WriteJSON(self.__Path, self.__Data)
+		Data = self.__Data.copy()
+		Data["api"] = self.__Data["api"].name
+		WriteJSON(self.__Path, Data)
 
 	def set_last_post_id(self, post_id: int, save: bool = True):
 		"""

@@ -1,0 +1,21 @@
+{
+	"api": "Open",
+	"bot_token": "",
+	"chat_id": null,
+	"clean_tags": true,
+	"disable_web_page_preview": true,
+	"blacklist": [],
+	"attachments": {
+		"doc": true,
+		"photo": true,
+		"video": true
+	},
+
+	"wall_id": null,
+	"last_post_id": null,
+	"login": "",
+	"password": "",
+	"app_id": 6121396,
+	"vk_token": "",
+	"period": 60
+}

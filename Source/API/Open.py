@@ -1,12 +1,12 @@
 from Source.API.Base import Base
 
+from threading import Thread
+from time import sleep
+import logging
+
 from vk_api.exceptions import AuthError, ApiError
 from vk_captcha import VkCaptchaSolver
-from threading import Thread
 from vk_api import VkApi
-from time import sleep
-
-import logging
 
 class Open(Base):
 	"""Обработчик Open API."""
@@ -66,7 +66,7 @@ class Open(Base):
 		RequestIndex = 0
 		
 		while IsUpdated == False:
-			Bufer = self.__GetPosts(self._Config.wall_id, Offset = 20 * RequestIndex)
+			Bufer = self.__GetPosts(self._Config.wall_id, offset = 20 * RequestIndex)
 
 			if self._Config.last_post_id != None:
 
@@ -131,10 +131,9 @@ class Open(Base):
 		
 		if self.__IsUpdating == False:
 			self.__IsUpdating = True
-			Posts = list(reversed(self.__GetUpdates()))
+			Posts = tuple(reversed(self.__GetUpdates()))
 			
-			if len(Posts) > 0:
-				self._Config.set_last_post_id(Posts[-1]["id"])		
+			if Posts: self._Config.set_last_post_id(Posts[-1]["id"])		
 
 			logging.info(f"[{self._Name} API] Source: \"{self._Config.name}\". Updates checked. New posts count: " + str(len(Posts)) + ".")
 			

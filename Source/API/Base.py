@@ -1,15 +1,15 @@
-from Source.Manager import Config
+from Source.BaseEditor import BaseEditor
+from Source.Config import Config
 
-from telebot.types import InputMediaDocument, InputMediaPhoto, InputMediaVideo
-from dublib.Polyglot import Markdown
 from threading import Thread
 from time import sleep
-
-import requests
 import logging
-import telebot
 import os
 import re
+
+from telebot.types import InputMediaDocument, InputMediaPhoto, InputMediaVideo
+import requests
+import telebot
 
 class Base:
 	"""Основание обработчиков API."""
@@ -21,7 +21,7 @@ class Base:
 	def _CleanTags(self, post: str) -> str:
 		"""Очищает теги в посту от упоминаний ВКонтакте."""
 		
-		RegexSubstrings = re.findall("#\w+@\w+", post)
+		RegexSubstrings = re.findall(r"#\w+@\w+", post)
 
 		for RegexSubstring in RegexSubstrings:
 			post = post.replace("@" + RegexSubstring.split('@')[1], "")
@@ -34,6 +34,17 @@ class Base:
 		for Index in range(len(self._PostsEditorsThreads)):
 			if not self._PostsEditorsThreads[Index].is_alive(): self._PostsEditorsThreads.remove(self._PostsEditorsThreads[Index])
 
+	def _ConvertAliases(self, text: str) -> str:
+		"""
+		Извлекает алиасы из текста ВКонтакте.
+			text – текст сообщения.
+		"""
+
+		Pattern = r'\[#alias\|([^|]+)\|(https?://[^\]]+)\]'
+		Replacement = r'<a href="\2">\1</a>'
+
+		return re.sub(Pattern, Replacement, text)
+
 	def _DownloadAttachments(self, data: dict) -> list:
 		"""
 		Скачивает вложения во временный каталог и возвращает список данных только доступных для отправки вложений.
@@ -45,7 +56,7 @@ class Base:
 		for Attachment in data:
 			Type = Attachment["type"]
 
-			if self._Config.check_attachments_type(Type):
+			if self._Config.check_attachment_type_available(Type):
 				Buffer = {
 					"type": Type,
 					"url": None,
@@ -93,36 +104,57 @@ class Base:
 
 				else: Attachements.append(Buffer)
 						
-		# logging.info(f"[{API_Type.value} API] Source: \"{Source}\". Post with ID {PostID} contains " + str(len(Attachements)) + " supported attachments.")						
+		logging.info(f"[{self._Name} API] Source: \"{self._Config.name}\". Post with ID ... contains " + str(len(Attachements)) + " supported attachments.")						
 
 		return Attachements
 
-	def _ParseAttachments(self, attachments: list) -> list[InputMediaDocument | InputMediaPhoto | InputMediaVideo]:
+	def _NormalizeMentions(self, text: str) -> str:
+		"""
+		Форматирует упоминания ВКонтакте в HTML-ссылки.
+			text – текст сообщения.
+		"""
+
+		Pattern = r'\[id(\d+)\|([^\]]+)\]'
+		Replacement = r'<a href="https://vk.com/id\1">\2</a>'
+	
+		return re.sub(Pattern, Replacement, text)
+
+	def _ParseAttachments(self, attachments: list, caption: str) -> list[InputMediaDocument | InputMediaPhoto | InputMediaVideo]:
 		"""
 		Преобразует данные вложений в объекты Telegram.
-			attachments – список данных вложений.
+			attachments – список данных вложений;\n
+			caption – текст.
 		"""
 
 		MediaGroup = list()
+		DocumentsGroup = list()
+		caption = caption[:1023]
 		
 		for Index in range(len(attachments)):
 			Input = None
-			Caption = None
-			ParseMode = None
+			if Index > 0: caption = None
 
-			if Index == 0:
-				Caption = attachments[0]["text"]
-				ParseMode = self._Config.parse_mode
+			Filename = attachments[Index]["filename"]
+			Path = f"Temp/{Filename}"
+			Filesize = int(os.path.getsize(Path) / (1024 * 1024))
 
-			match attachments[Index]["type"]:
+			Types = {
+				"doc": InputMediaDocument,
+				"photo": InputMediaPhoto,
+				"video": InputMediaVideo
+			}
 
-				case "doc": Input = InputMediaDocument(open("Temp/" + attachments[Index]["filename"], "rb"), Caption, ParseMode)
-				case "photo": Input = InputMediaPhoto(open("Temp/" + attachments[Index]["filename"], "rb"), Caption, ParseMode)
-				case "video": Input = InputMediaVideo(open("Temp/" + attachments[Index]["filename"], "rb"), Caption, ParseMode)
+			for Type in Types.keys():
+				
+				if Type == attachments[Index]["type"]:
+					if Filesize < 20: Input = Types[Type](open(Path, "rb"), caption = caption, parse_mode = "HTML")
+					else: logging.warning(f"Attachment \"{Filename}\" is too large ({Filesize} MB).")
+					break
 
-			if Input: MediaGroup.append(Input)
+			if type(Input) == InputMediaDocument: DocumentsGroup.append(Input)
+			else: MediaGroup.append(Input)
 
-		return MediaGroup
+		return MediaGroup, DocumentsGroup
 
 	def _PopMessage(self):
 		"""Удаляет первое сообщение из буфера ожидания и очищает его вложения."""
@@ -142,7 +174,7 @@ class Base:
 			post – данные поста.
 		"""
 
-		# logging.info(f"[{self._Name} API] Source: \"{source}\". New post with ID " + str(data["object"]["id"]) + ".")
+		logging.info(f"[{self._Name} API] Source: \"{self._Config.name}\". New post with ID " + str(post["id"]) + ".")
 
 		HasBlacklistRegex = False
 		AllowedTypes = ["post", "reply"]
@@ -151,22 +183,26 @@ class Base:
 			"attachments": []
 		}
 
-		if self._Config.parse_mode == "MarkdownV2": post["text"] = Markdown(post["text"]).escaped_text
+		if post["text"]:
 
-		# PostObject["text"] = MessageEditor(PostObject["text"] if PostObject["text"] != None else "", Source)
+			for ForbiddenRegex in self._Config.blacklist:
+				if re.search(ForbiddenRegex, post["text"], re.IGNORECASE): HasBlacklistRegex = True
+
+		post["text"] = self._ConvertAliases(post["text"])
+		post["text"] = self._NormalizeMentions(post["text"])
 		
-		for ForbiddenRegex in self._Config.blacklist:
-			if re.search(ForbiddenRegex, post["text"] if post["text"] != None else "", re.IGNORECASE) != None: HasBlacklistRegex = True
+		if self._Editor: 
+			try: post["text"] = self._Editor.edit(post["text"])
+			except Exception as ExceptionData: logging.error(f"[{self._Name} API] Source: \"{self._Config.name}\". Editor exception: {ExceptionData}.")
 
-		if post["text"] and HasBlacklistRegex == False and post["post_type"] in AllowedTypes:
+		if post["text"] and not HasBlacklistRegex and post["post_type"] in AllowedTypes:
 			if self._Config.is_clean_tags: post["text"] = self._CleanTags(post["text"])
 			MessageStruct["text"] = post["text"][:4096]
-			if len(post["attachments"]): MessageStruct["attachments"] = self._DownloadAttachments(post["attachments"])
+			if post["attachments"]: MessageStruct["attachments"] = self._DownloadAttachments(post["attachments"])
 			self._MessagesBuffer.append(MessageStruct)
 
 		else:
-			# logging.info(f"[{self._Name} API] Source: \"{Source}\". Post with ID " + str(post["id"]) + " was ignored.")
-			pass
+			logging.info(f"[{self._Name} API] Source: \"{self._Config.name}\". Post with ID " + str(post["id"]) + " was ignored.")
 
 		self._StartSenderThread()
 
@@ -175,19 +211,21 @@ class Base:
 
 		logging.debug(f"[{self._Name} API] Sender thread started.")
 		
-		while len(self._MessagesBuffer):
-			MediaGroup = list()
+		while self._MessagesBuffer:
+			MediaGroups = tuple()
+			if self._MessagesBuffer[0]["attachments"]: MediaGroups = self._ParseAttachments(self._MessagesBuffer[0]["attachments"], self._MessagesBuffer[0]["text"])
 						
 			try:
 				
-				if len(MediaGroup):
-					self._Config.bot.send_media_group(self._Config.chat_id, media = MediaGroup)
+				if MediaGroups:
+					for Group in MediaGroups:
+						if Group: self._Config.bot.send_media_group(chat_id = self._Config.chat_id, media = Group)
 
 				else: 
 					self._Config.bot.send_message(
-						self._Config.chat_id,
-						self._MessagesBuffer[0]["text"],
-						self._Config.parse_mode, 
+						chat_id = self._Config.chat_id,
+						text = self._MessagesBuffer[0]["text"][:2047],
+						parse_mode = "HTML", 
 						disable_web_page_preview = self._Config.is_disable_web_page_preview
 					)
 				
@@ -228,15 +266,17 @@ class Base:
 	# >>>>> ПУБЛИЧНЫЕ МЕТОДЫ <<<<< #
 	#==========================================================================================#
 
-	def __init__(self, config: Config):
+	def __init__(self, config: Config, editor: BaseEditor):
 		"""
 		Основание обработчиков API.
-			config – конфигурация.
+			editor – редактор постов;\n
+			config – конфигурация источника.
 		"""
 
 		#---> Генерация динамических атриубтов.
 		#==========================================================================================#
 		self._Config = config
+		self._Editor: BaseEditor = editor
 
 		self._Name = self._Config.type.value
 		self._MessagesBuffer = list()

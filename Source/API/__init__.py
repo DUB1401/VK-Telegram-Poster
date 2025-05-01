@@ -1,9 +1,4 @@
-from .Callback import Callback
-from .Open import Open
+from Source.API.Callback import Callback
+from Source.API.Open import Open
 
-import enum
-
-class Types(enum.Enum):
-	Callback = "Callback"
-	LongPoll = "LongPoll"
-	Open = "Open"
+from Source.API.Types import Types

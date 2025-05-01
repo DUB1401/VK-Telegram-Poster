@@ -1,10 +1,11 @@
-from Source.Manager import SystemManager
+from Source.SystemManager import Manager
 from Source.API import Types
 
+from dublib.Methods.Filesystem import ReadJSON, ReadTextFile
 from dublib.Methods.System import CheckPythonMinimalVersion
 from dublib.Methods.Filesystem import MakeRootDirectories
+
 from starlette.responses import HTMLResponse, Response
-from dublib.Methods.JSON import ReadJSON
 from starlette.requests import Request
 from fastapi import FastAPI
 
@@ -17,7 +18,7 @@ import sys
 #==========================================================================================#
 
 CheckPythonMinimalVersion(3, 10)
-MakeRootDirectories(["Configs", "Logs", "Scripts", "Temp"])
+MakeRootDirectories(["Configs", "Editors", "Logs", "Temp"])
 
 CurrentDate = datetime.datetime.now()
 LogFilename = "Logs/" + str(CurrentDate)[:-7] + ".log"
@@ -26,14 +27,14 @@ logging.basicConfig(filename = LogFilename, encoding = "utf-8", level = logging.
 logging.getLogger("vk_api").setLevel(logging.CRITICAL)
 
 Version = "2.0.0"
-Copyright = "Copyright © DUB1401. 2022-2024."
+Copyright = ReadTextFile("README.md", split = "\n")[-1].strip("_")
 Settings = ReadJSON("Settings.json")
 
 logging.info("====== VK-Telegram Poster v" + Version + " ======")
-logging.info("Starting with Python " + str(sys.version_info.major) + "." + str(sys.version_info.minor) + "." + str(sys.version_info.micro) + " on " + str(sys.platform) + ".")
+logging.info(f"Starting with Python {sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro} on {sys.platform}.")
 
 App = FastAPI()
-Manager = SystemManager()
+Manager = Manager()
 Workers = list()
 
 logging.info("====== Working ======")
@@ -41,6 +42,26 @@ logging.info("====== Working ======")
 #==========================================================================================#
 # >>>>> ОБРАБОТКА API <<<<< #
 #==========================================================================================#
+
+@App.get("/")
+def WorkingStatus() -> HTMLResponse:
+	ResponseBody = f"""
+		<html>
+			<head>
+				<title>VK-Telegram Poster</title>
+				<link rel="icon" href="https://web.telegram.org/a/favicon.svg" type="image/svg+xml">
+			</head>
+			<body style="background-color: #0E1010; color: #D4CDF5;">
+				<span style="font-size: 200%;">VK-Telegram Poster</span><br>
+				<b>Version:</b> {Version}<br>
+				<b>Status:</b> <span style="color: green;">200 OK</span><br>
+				<br>
+				{Copyright} | <a href="https://github.com/DUB1401/VK-Telegram-Poster" style="text-decoration: none; color: #F5E3CD;">GitHub</a><br>
+			</body>
+		</html>
+	"""
+
+	return HTMLResponse(content = ResponseBody)
 
 if Manager.check_api(Types.Callback):
 
