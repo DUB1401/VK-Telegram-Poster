@@ -45,7 +45,7 @@ class Base:
 
 		return re.sub(Pattern, Replacement, text)
 
-	def _DownloadAttachments(self, data: dict) -> list:
+	def _DownloadAttachments(self, post_id: int, data: dict) -> list:
 		"""
 		Скачивает вложения во временный каталог и возвращает список данных только доступных для отправки вложений.
 			data – данные вложений.
@@ -96,7 +96,7 @@ class Base:
 							Attachements.append(Buffer)
 							with open("Temp/" + Buffer["filename"], "wb") as FileWriter: FileWriter.write(Response.content)
 
-						else: logging.error("Unable to download attachment (\"" + Type + "\"). Request code: " + str(Response.status_code) + ".")
+						else: logging.error(f"Unable to download attachment \"{Type}\". Request code: {Response.status_code}.")
 
 					elif Buffer["type"] == "video":
 						ExitCode = os.system("python yt-dlp -o " + Buffer["filename"] + " -P Temp " + Buffer["url"])
@@ -104,7 +104,7 @@ class Base:
 
 				else: Attachements.append(Buffer)
 						
-		logging.info(f"[{self._Name} API] Source: \"{self._Config.name}\". Post with ID ... contains " + str(len(Attachements)) + " supported attachments.")						
+		logging.info(f"[{self._Name} API] Source: \"{self._Config.name}\". Post {post_id} contains " + str(len(Attachements)) + " supported attachments.")						
 
 		return Attachements
 
@@ -174,7 +174,8 @@ class Base:
 			post – данные поста.
 		"""
 
-		logging.info(f"[{self._Name} API] Source: \"{self._Config.name}\". New post with ID " + str(post["id"]) + ".")
+		PostID = post["id"]
+		logging.info(f"[{self._Name} API] Source: \"{self._Config.name}\". New post {PostID}.")
 
 		HasBlacklistRegex = False
 		AllowedTypes = ["post", "reply"]
@@ -184,25 +185,32 @@ class Base:
 		}
 
 		if post["text"]:
-
 			for ForbiddenRegex in self._Config.blacklist:
-				if re.search(ForbiddenRegex, post["text"], re.IGNORECASE): HasBlacklistRegex = True
+				if re.search(ForbiddenRegex, post["text"], re.IGNORECASE):
+					HasBlacklistRegex = True
+					break
 
 		post["text"] = self._ConvertAliases(post["text"])
 		post["text"] = self._NormalizeMentions(post["text"])
+
+		if not self._Config.donut_posts and post["donut"]["is_donut"]:
+			logging.info(f"[{self._Name} API] Source: \"{self._Config.name}\". Donut post {PostID} was ignored.")
+			return
 		
 		if self._Editor: 
 			try: post["text"] = self._Editor.edit(post["text"])
-			except Exception as ExceptionData: logging.error(f"[{self._Name} API] Source: \"{self._Config.name}\". Editor exception: {ExceptionData}.")
+			except Exception as ExceptionData:
+				Type = type(ExceptionData).__qualname__
+				logging.error(f"[{self._Name} API] Source: \"{self._Config.name}\". {Type}: {ExceptionData}.")
 
-		if post["text"] and not HasBlacklistRegex and post["post_type"] in AllowedTypes:
-			if self._Config.is_clean_tags: post["text"] = self._CleanTags(post["text"])
-			MessageStruct["text"] = post["text"][:4096]
-			if post["attachments"]: MessageStruct["attachments"] = self._DownloadAttachments(post["attachments"])
-			self._MessagesBuffer.append(MessageStruct)
+		if not post["text"] or HasBlacklistRegex or post["post_type"] not in AllowedTypes:
+			logging.info(f"[{self._Name} API] Source: \"{self._Config.name}\". Post {PostID} was ignored.")
+			return
 
-		else:
-			logging.info(f"[{self._Name} API] Source: \"{self._Config.name}\". Post with ID " + str(post["id"]) + " was ignored.")
+		if self._Config.is_clean_tags: post["text"] = self._CleanTags(post["text"])
+		MessageStruct["text"] = post["text"][:4096]
+		if post["attachments"]: MessageStruct["attachments"] = self._DownloadAttachments(PostID, post["attachments"])
+		self._MessagesBuffer.append(MessageStruct)
 
 		self._StartSenderThread()
 

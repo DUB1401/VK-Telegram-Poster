@@ -75,6 +75,12 @@ class Config:
 		return self.__Data["chat_id"]
 	
 	@property
+	def donut_posts(self) -> bool:
+		"""Состояние: включена ли пересылка постов VK Donut."""
+
+		return self.__Data["donut_posts"]
+
+	@property
 	def is_clean_tags(self) -> bool:
 		"""Состояние: включена ли очистка тегов ВКонтакте."""
 
@@ -143,15 +149,17 @@ class Config:
 
 		Data = ReadJSON(self.__Path)
 
-		for Key in self.__Data.keys():
+		Data["api"] = Types(Data["api"])
+		Examples = {
+			Types.Callback: "Configs/# Callback API Example.json",
+			Types.Open: "Configs/# Open API Example.json"
+		}
+		self.__Data = ReadJSON(Examples[Data["api"]])
 
+		for Key in self.__Data.keys():
 			if Key not in Data.keys():
 				Data[Key] = self.__Data[Key]
 				logging.warning(f"Option \"{Key}\" dropped to default in \"{self.__Name}\" config.")
-
-		if Data["api"].lower() == "callback": Data["api"] = Types.Callback
-		elif Data["api"].lower() == "longpoll": Data["api"] = Types.LongPoll
-		elif Data["api"].lower() == "open": Data["api"] = Types.Open
 
 		self.__Data = Data
 
@@ -170,30 +178,7 @@ class Config:
 		self.__Name = name
 
 		self.__Path = f"Configs/{name}.json"
-		self.__Data = {
-			"api": None,
-			"bot_token": None,
-			"chat_id": None,
-
-			"clean_tags": True,
-			"disable_web_page_preview": True,
-			"blacklist": [],
-
-			"attachments": {
-				"doc": True,
-				"photo": True,
-				"video": True
-			},
-
-			"login": None,
-			"password": None,
-			"app_id": 6121396,
-			"vk_token": None,
-			"wall_id": None,
-			
-			"period": 60,
-			"last_post_id": None
-		}
+		self.__Data = dict()
 
 		self.__Read()
 

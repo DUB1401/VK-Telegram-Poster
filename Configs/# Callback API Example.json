@@ -3,6 +3,7 @@
 	"bot_token": "",
 	"chat_id": null,
 	"clean_tags": true,
+	"donut_posts": false,
 	"disable_web_page_preview": true,
 	"blacklist": [],
 	"attachments": {

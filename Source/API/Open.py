@@ -129,18 +129,14 @@ class Open(Base):
 
 	def check_updates(self):
 		
-		if self.__IsUpdating == False:
+		if not self.__IsUpdating:
 			self.__IsUpdating = True
-			Posts = tuple(reversed(self.__GetUpdates()))
-			
-			if Posts: self._Config.set_last_post_id(Posts[-1]["id"])		
 
+			Posts = tuple(reversed(self.__GetUpdates()))
+			if Posts: self._Config.set_last_post_id(Posts[-1]["id"])
 			logging.info(f"[{self._Name} API] Source: \"{self._Config.name}\". Updates checked. New posts count: " + str(len(Posts)) + ".")
-			
-			for Post in Posts:
-				logging.info(f"[{self._Name} API] Source: \"{self._Config.name}\". New post with ID " + str(Post["id"]) + ".")
-				self._PushMessage(Post)
-					
+			for Post in Posts: self._PushMessage(Post)
+
 			self._StartSenderThread()
 			self.__IsUpdating = False
 			

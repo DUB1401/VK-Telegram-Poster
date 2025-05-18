@@ -102,7 +102,7 @@ if Manager.check_api(Types.Callback):
 		if "type" in RequestData.keys():
 		
 			if RequestData["type"] == "confirmation":
-				logging.info("[Callback API] Confirmation code requested: \"" + Settings["confirmation-code"] + "\".")
+				logging.info("[Callback API] Confirmation code requested: \"" + Settings["confirmation_code"] + "\".")
 
 				return Response(content = Settings["confirmation_code"])
 
